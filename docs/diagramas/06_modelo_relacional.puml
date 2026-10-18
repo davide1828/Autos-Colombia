@@ -1,0 +1,58 @@
+@startuml relacional
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam linetype ortho
+skinparam classBackgroundColor #F7F9FB
+skinparam classBorderColor #0f4c81
+skinparam entityBackgroundColor #F7F9FB
+skinparam entityBorderColor #0f4c81
+hide circle
+title Modelo Relacional
+
+entity CLIENTE {
+  PK id_cliente
+  documento
+  nombre
+  telefono
+}
+entity MENSUALIDAD {
+  PK id_mensualidad
+  FK id_cliente
+  fecha_inicio
+  fecha_fin
+}
+entity VEHICULO {
+  PK id_vehiculo
+  placa
+  tipo
+  FK id_cliente
+}
+entity CELDA {
+  PK id_celda
+  codigo
+  tipo
+  estado
+}
+entity REGISTRO {
+  PK id_registro
+  FK id_vehiculo
+  FK id_celda
+  fecha_entrada
+  fecha_salida
+}
+entity NOVEDAD {
+  PK id_novedad
+  FK id_registro
+  FK id_vehiculo
+  tipo
+  descripcion
+  momento
+  fecha
+}
+CLIENTE ||--o{ VEHICULO
+CLIENTE ||--o{ MENSUALIDAD
+VEHICULO ||--o{ REGISTRO
+CELDA ||--o{ REGISTRO
+REGISTRO ||--o{ NOVEDAD
+VEHICULO ||--o{ NOVEDAD
+@enduml

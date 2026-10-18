@@ -1,0 +1,90 @@
+@startuml clases
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classBackgroundColor #F7F9FB
+skinparam classBorderColor #0f4c81
+skinparam classAttributeIconSize 0
+title Diagrama de clases - Dominio y servicio de aplicación
+
+enum TipoVehiculo {
+  CARRO
+  MOTO
+}
+enum EstadoCelda {
+  DISPONIBLE
+  OCUPADA
+  INACTIVA
+}
+enum TipoNovedad {
+  DANIO
+  FALTANTE
+  OTRA
+}
+enum MomentoNovedad {
+  ENTRADA
+  SALIDA
+  DURANTE_ESTANCIA
+}
+
+class Cliente {
+  - id: int
+  - documento: string
+  - nombre: string
+}
+class Mensualidad {
+  - id: int
+  - fechaInicio: date
+  - fechaFin: date
+  + estaVigente(dia): bool
+}
+class Vehiculo {
+  - id: int
+  - placa: string
+  - tipo: TipoVehiculo
+}
+class Celda {
+  - id: int
+  - codigo: string
+  - tipo: TipoVehiculo
+  - estado: EstadoCelda
+  + puedeOcuparse(): bool
+}
+class Registro {
+  - id: int
+  - fechaEntrada: datetime
+  - fechaSalida: datetime
+  + estaActivo(): bool
+  + duracion(ahora): duration
+}
+class Novedad {
+  - id: int
+  - tipo: TipoNovedad
+  - descripcion: string
+  - momento: MomentoNovedad
+  - fecha: datetime
+  + validar()
+}
+class Servicio <<aplicación>> {
+  + registrarIngreso(placa, idCelda, novedad)
+  + registrarSalida(placa, novedad)
+  + registrarNovedad(placa, novedad)
+  + consultarCeldas(estado)
+  + vehiculosDentro()
+}
+interface Repositorio <<puerto>>
+class RepoPostgres <<adaptador>>
+
+Cliente "1" -- "0..*" Vehiculo : posee
+Cliente "1" -- "0..*" Mensualidad : contrata
+Vehiculo "1" -- "0..*" Registro : genera
+Celda "1" -- "0..*" Registro : aloja
+Registro "1" -- "0..*" Novedad : tiene
+Vehiculo ..> TipoVehiculo
+Celda ..> EstadoCelda
+Novedad ..> TipoNovedad
+Novedad ..> MomentoNovedad
+Servicio --> Repositorio : usa
+RepoPostgres ..|> Repositorio
+Servicio ..> Registro
+Servicio ..> Novedad
+@enduml

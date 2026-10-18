@@ -1,0 +1,25 @@
+@startuml mer
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam linetype ortho
+skinparam classBackgroundColor #F7F9FB
+skinparam classBorderColor #0f4c81
+skinparam entityBackgroundColor #F7F9FB
+skinparam entityBorderColor #0f4c81
+hide circle
+title Modelo Entidad-Relación (conceptual)
+
+entity CLIENTE
+entity MENSUALIDAD
+entity VEHICULO
+entity CELDA
+entity REGISTRO
+entity NOVEDAD
+
+CLIENTE ||--o{ VEHICULO : posee
+CLIENTE ||--o{ MENSUALIDAD : contrata
+VEHICULO ||--o{ REGISTRO : genera
+CELDA ||--o{ REGISTRO : aloja
+REGISTRO ||--o{ NOVEDAD : tiene
+VEHICULO ||--o{ NOVEDAD : "afecta a"
+@enduml

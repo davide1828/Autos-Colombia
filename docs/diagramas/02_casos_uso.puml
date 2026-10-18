@@ -1,0 +1,28 @@
+@startuml casos_uso
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam usecaseBackgroundColor #E8F1F8
+skinparam usecaseBorderColor #0f4c81
+left to right direction
+title Casos de uso - Iteración 1: entrada y salida de vehículos
+
+actor "Encargado" as E
+rectangle "Sistema de parqueadero Autos Colombia" {
+  usecase "CU-01 Consultar celdas\ndisponibles" as CU1
+  usecase "CU-02 Registrar ingreso" as CU2
+  usecase "CU-03 Registrar salida" as CU3
+  usecase "CU-04 Registrar novedad" as CU4
+  usecase "CU-05 Consultar vehículos\ndentro" as CU5
+  usecase "Validar mensualidad\nvigente" as V
+  usecase "Validar celda\nen ocupación" as VC
+}
+E --> CU1
+E --> CU2
+E --> CU3
+E --> CU4
+E --> CU5
+CU2 ..> V : <<include>>
+CU2 ..> VC : <<include>>
+CU2 ..> CU4 : <<extend>>\n(si hay novedad)
+CU3 ..> CU4 : <<extend>>\n(si hay novedad)
+@enduml

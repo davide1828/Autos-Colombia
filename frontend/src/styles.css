@@ -1,0 +1,30 @@
+:root { --azul:#0f4c81; --fondo:#f4f6f8; --ok:#1b7f3b; --err:#b3261e; font-family: system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--fondo); color:#1c2530; }
+.app { max-width:720px; margin:0 auto; min-height:100vh; padding-bottom:76px; }
+header { display:flex; gap:12px; align-items:center; justify-content:space-between; padding:14px 16px; background:var(--azul); color:#fff; flex-wrap:wrap; }
+header h1 { font-size:1.2rem; margin:0; }
+.token { padding:8px; border-radius:8px; border:0; min-width:0; flex:1 1 140px; max-width:220px; }
+main { padding:16px; }
+h2 { font-size:1.1rem; margin:8px 0 12px; }
+form { display:grid; gap:14px; }
+label { display:grid; gap:6px; font-weight:600; font-size:.95rem; }
+input, select, textarea { font:inherit; padding:12px; border:1px solid #b9c3cd; border-radius:10px; background:#fff; width:100%; }
+fieldset { border:1px solid #d3dae0; border-radius:10px; display:grid; gap:8px; padding:12px; }
+legend { font-weight:600; font-size:.9rem; padding:0 6px; }
+form > button { padding:14px; font-size:1rem; font-weight:700; border:0; border-radius:12px; background:var(--azul); color:#fff; cursor:pointer; }
+.msg { padding:10px 12px; border-radius:10px; margin:8px 16px; }
+form .msg { margin:0; }
+.msg.ok { background:#e3f4e8; color:var(--ok); }
+.msg.error { background:#fbe4e2; color:var(--err); }
+.tarjetas, .celdas { list-style:none; padding:0; margin:0 0 16px; display:grid; gap:10px; }
+.tarjetas li { background:#fff; padding:12px; border-radius:10px; border:1px solid #d3dae0; display:grid; gap:2px; }
+.tarjetas small, .celdas small { color:#5a6773; font-size:.8rem; }
+.celdas { grid-template-columns:repeat(auto-fill, minmax(96px, 1fr)); }
+.celdas li { padding:12px 8px; border-radius:10px; text-align:center; font-weight:700; display:grid; }
+.celdas .disponible { background:#e3f4e8; } .celdas .ocupada { background:#fbe4e2; } .celdas .inactiva { background:#e5e8eb; }
+.vacio { color:#5a6773; }
+nav { position:fixed; bottom:0; left:0; right:0; display:flex; background:#fff; border-top:1px solid #d3dae0; max-width:720px; margin:0 auto; }
+nav button { flex:1; padding:16px 4px; border:0; background:transparent; font:inherit; font-weight:600; cursor:pointer; color:#4a5663; }
+nav button.activa { color:var(--azul); border-top:3px solid var(--azul); }
+@media (min-width:800px) { main { padding:24px; } }

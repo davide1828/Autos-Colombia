@@ -1,0 +1,30 @@
+@startuml arquitectura
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentBackgroundColor #E8F1F8
+skinparam componentBorderColor #0f4c81
+skinparam rectangleBackgroundColor #F7F9FB
+skinparam rectangleBorderColor #0f4c81
+title Arquitectura en capas (hexagonal) - Autos Colombia
+
+actor "Encargado" as E
+node "Celular / Tablet / PC\n(navegador, PWA)" as N {
+  component "Frontend React\n(formularios, mensajes)" as FE
+}
+rectangle "Servidor (Go)" as S {
+  rectangle "Capa de presentación\nAdaptador HTTP / API REST JSON\n(validación de entrada, token, códigos HTTP)" as P
+  rectangle "Capa de aplicación\nCasos de uso: RegistrarIngreso,\nRegistrarSalida, RegistrarNovedad, Consultas" as A
+  rectangle "Capa de dominio\nEntidades y reglas de negocio\n(Vehiculo, Celda, Registro, Novedad)" as D
+  rectangle "Puerto: Repositorio (interfaz)" as PR
+  rectangle "Capa de persistencia\nAdaptador PostgreSQL (database/sql)" as DB
+}
+database "PostgreSQL" as PG
+
+E --> FE
+FE --> P : HTTPS / JSON
+P --> A
+A --> D
+A --> PR
+DB ..|> PR : implementa
+DB --> PG : SQL
+@enduml

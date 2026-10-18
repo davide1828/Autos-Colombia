@@ -1,0 +1,31 @@
+@startuml paquetes
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam packageBackgroundColor #F7F9FB
+skinparam packageBorderColor #0f4c81
+title Diagrama de paquetes
+
+package "Presentación" {
+  package "frontend (React)" as FE
+  package "adapters/httpapi" as HTTP
+}
+package "Aplicación y dominio" {
+  package "application" as APP
+  package "domain" as DOM
+}
+package "Persistencia" {
+  package "adapters/postgres" as PGP
+  package "db (schema.sql, seed.sql)" as SQL
+}
+package "cmd/api (arranque)" as MAIN
+
+FE ..> HTTP : REST/JSON
+HTTP ..> APP
+APP ..> DOM
+PGP ..> APP : implementa Repositorio
+PGP ..> DOM
+PGP ..> SQL
+MAIN ..> HTTP
+MAIN ..> PGP
+MAIN ..> APP
+@enduml

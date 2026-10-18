@@ -1,0 +1,67 @@
+@startuml fisico
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam linetype ortho
+skinparam classBackgroundColor #F7F9FB
+skinparam classBorderColor #0f4c81
+skinparam entityBackgroundColor #F7F9FB
+skinparam entityBorderColor #0f4c81
+hide circle
+title Modelo Físico (PostgreSQL)
+
+entity cliente {
+  * id_cliente : SERIAL <<PK>>
+  --
+  * documento : VARCHAR(20) <<UQ>>
+  * nombre : VARCHAR(100)
+  telefono : VARCHAR(20)
+}
+entity mensualidad {
+  * id_mensualidad : SERIAL <<PK>>
+  --
+  * id_cliente : INT <<FK>>
+  * fecha_inicio : DATE
+  * fecha_fin : DATE
+  CHECK fecha_fin >= fecha_inicio
+}
+entity vehiculo {
+  * id_vehiculo : SERIAL <<PK>>
+  --
+  * placa : VARCHAR(6) <<UQ>>
+  * tipo : VARCHAR(5) CHECK CARRO|MOTO
+  * id_cliente : INT <<FK>>
+}
+entity celda {
+  * id_celda : SERIAL <<PK>>
+  --
+  * codigo : VARCHAR(10) <<UQ>>
+  * tipo : VARCHAR(5) CHECK CARRO|MOTO
+  * estado : VARCHAR(10) CHECK DISPONIBLE|OCUPADA|INACTIVA
+}
+entity registro {
+  * id_registro : SERIAL <<PK>>
+  --
+  * id_vehiculo : INT <<FK>>
+  * id_celda : INT <<FK>>
+  * fecha_entrada : TIMESTAMPTZ
+  fecha_salida : TIMESTAMPTZ
+  UQ parcial (id_vehiculo) WHERE fecha_salida IS NULL
+  UQ parcial (id_celda) WHERE fecha_salida IS NULL
+}
+entity novedad {
+  * id_novedad : SERIAL <<PK>>
+  --
+  * id_registro : INT <<FK>>
+  * id_vehiculo : INT <<FK>>
+  * tipo : VARCHAR(10) CHECK DANIO|FALTANTE|OTRA
+  * descripcion : VARCHAR(500)
+  * momento : VARCHAR(20)
+  * fecha : TIMESTAMPTZ
+}
+cliente ||--o{ vehiculo
+cliente ||--o{ mensualidad
+vehiculo ||--o{ registro
+celda ||--o{ registro
+registro ||--o{ novedad
+vehiculo ||--o{ novedad
+@enduml
