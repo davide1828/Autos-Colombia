@@ -1,12 +1,12 @@
 @startuml relacional
 skinparam shadowing false
 skinparam defaultFontName Arial
-skinparam linetype ortho
 skinparam classBackgroundColor #F7F9FB
 skinparam classBorderColor #0f4c81
 skinparam entityBackgroundColor #F7F9FB
 skinparam entityBorderColor #0f4c81
 hide circle
+left to right direction
 title Modelo Relacional
 
 entity CLIENTE {

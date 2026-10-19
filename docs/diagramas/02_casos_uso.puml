@@ -23,6 +23,6 @@ E --> CU4
 E --> CU5
 CU2 ..> V : <<include>>
 CU2 ..> VC : <<include>>
-CU2 ..> CU4 : <<extend>>\n(si hay novedad)
-CU3 ..> CU4 : <<extend>>\n(si hay novedad)
+CU4 ..> CU2 : <<extend>>\n(si hay novedad)
+CU4 ..> CU3 : <<extend>>\n(si hay novedad)
 @enduml
