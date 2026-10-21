@@ -41,3 +41,7 @@ cd backend && go test ./...
 | GET | `/api/registros/activos` | Vehículos dentro |
 
 Todas exigen `Authorization: Bearer <API_TOKEN>`.
+
+## Mockups
+
+Archivo de Figma: https://www.figma.com/design/DhCeukFFGQef4egiIl3UbY/
