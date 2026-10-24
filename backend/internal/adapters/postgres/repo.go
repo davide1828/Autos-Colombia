@@ -31,7 +31,8 @@ func (r *Repo) MensualidadVigente(ctx context.Context, clienteID int, dia time.T
 	var ok bool
 	err := r.db.QueryRowContext(ctx,
 		`SELECT EXISTS (SELECT 1 FROM mensualidad
-		   WHERE id_cliente=$1 AND $2::date BETWEEN fecha_inicio AND fecha_fin)`, clienteID, dia).Scan(&ok)
+		   WHERE id_cliente=$1 AND $2::date BETWEEN fecha_inicio AND fecha_fin)`,
+		clienteID, dia.Format("2006-01-02")).Scan(&ok) // día calendario en la zona de "dia"
 	return ok, err
 }
 

@@ -1,190 +1,117 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, setToken } from "./api.js";
+import { api, configurar, sesion } from "./api.js";
+import Icono from "./components/Icono.jsx";
+import Login from "./components/Login.jsx";
+import Patio from "./components/Patio.jsx";
+import { resumenOcupacion } from "./lib/format.js";
+import Ingreso from "./views/Ingreso.jsx";
+import Novedad from "./views/Novedad.jsx";
+import Salida from "./views/Salida.jsx";
 
-const TIPOS = [
-  { v: "DANIO", t: "Daño" },
-  { v: "FALTANTE", t: "Faltante" },
-  { v: "OTRA", t: "Otra" },
+const VISTAS = [
+  { id: "ingreso", texto: "Ingreso", icono: "entrar" },
+  { id: "salida", texto: "Salida", icono: "salir" },
+  { id: "novedad", texto: "Novedad", icono: "novedad" },
+  { id: "patio", texto: "Patio", icono: "patio", soloMovil: true },
 ];
+const REFRESCO_MS = 30_000;
 
-function Mensaje({ m }) {
-  if (!m) return null;
-  return <p role="status" className={`msg ${m.ok ? "ok" : "error"}`}>{m.texto}</p>;
+function useConexion() {
+  const [enLinea, setEnLinea] = useState(navigator.onLine);
+  useEffect(() => {
+    const a = () => setEnLinea(true), b = () => setEnLinea(false);
+    window.addEventListener("online", a); window.addEventListener("offline", b);
+    return () => { window.removeEventListener("online", a); window.removeEventListener("offline", b); };
+  }, []);
+  return enLinea;
 }
 
-function CampoNovedad({ valor, onChange }) {
-  return (
-    <fieldset>
-      <legend>Novedad (opcional)</legend>
-      <select value={valor.tipo} onChange={(e) => onChange({ ...valor, tipo: e.target.value })}>
-        {TIPOS.map((t) => <option key={t.v} value={t.v}>{t.t}</option>)}
-      </select>
-      <textarea
-        rows={2}
-        maxLength={500}
-        placeholder="Ej.: rayón en la puerta izquierda"
-        value={valor.descripcion}
-        onChange={(e) => onChange({ ...valor, descripcion: e.target.value })}
-      />
-    </fieldset>
-  );
-}
+function Tablero({ sinSesion }) {
+  const [vista, setVista] = useState("ingreso");
+  const [celdas, setCeldas] = useState([]);
+  const [activos, setActivos] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [ahora, setAhora] = useState(() => Date.now());
+  const enLinea = useConexion();
 
-const novedadVacia = { tipo: "DANIO", descripcion: "" };
-const aEnvio = (n) => (n.descripcion.trim() ? n : undefined);
-
-function Ingreso({ celdas, onCambio }) {
-  const [placa, setPlaca] = useState("");
-  const [celda, setCelda] = useState("");
-  const [nov, setNov] = useState(novedadVacia);
-  const [msg, setMsg] = useState(null);
-
-  async function enviar(e) {
-    e.preventDefault();
+  const refrescar = useCallback(async () => {
     try {
-      await api.ingreso({ placa, id_celda: Number(celda), novedad: aEnvio(nov) });
-      setMsg({ ok: true, texto: `Ingreso registrado para ${placa.toUpperCase()}.` });
-      setPlaca(""); setCelda(""); setNov(novedadVacia); onCambio();
-    } catch (err) { setMsg({ ok: false, texto: err.message }); }
-  }
+      const [c, a] = await Promise.all([api.celdas(), api.activos()]);
+      setCeldas(c); setActivos(a); setError("");
+    } catch (e) { setError(e.message); }
+    finally { setCargando(false); setAhora(Date.now()); }
+  }, []);
+
+  useEffect(() => {
+    refrescar();
+    const t = setInterval(() => { if (!document.hidden) refrescar(); }, REFRESCO_MS);
+    const v = () => { if (!document.hidden) refrescar(); };
+    document.addEventListener("visibilitychange", v);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", v); };
+  }, [refrescar]);
+
+  // Con pantalla ancha el patio siempre está visible junto al formulario: no existe la pestaña "Patio".
+  useEffect(() => {
+    const m = window.matchMedia("(min-width: 720px)");
+    const ajustar = () => { if (m.matches) setVista((v) => (v === "patio" ? "ingreso" : v)); };
+    ajustar();
+    m.addEventListener("change", ajustar);
+    return () => m.removeEventListener("change", ajustar);
+  }, []);
+
+  const r = resumenOcupacion(celdas);
+  const patio = <Patio celdas={celdas} activos={activos} ahora={ahora} cargando={cargando} error={error} />;
 
   return (
-    <form onSubmit={enviar}>
-      <h2>Registrar ingreso</h2>
-      <label>Placa
-        <input value={placa} onChange={(e) => setPlaca(e.target.value)} placeholder="ABC123" maxLength={8} required autoCapitalize="characters" />
-      </label>
-      <label>Celda disponible
-        <select value={celda} onChange={(e) => setCelda(e.target.value)} required>
-          <option value="">Seleccione…</option>
-          {celdas.map((c) => <option key={c.id_celda} value={c.id_celda}>{c.codigo} · {c.tipo === "CARRO" ? "Carro" : "Moto"}</option>)}
-        </select>
-      </label>
-      <CampoNovedad valor={nov} onChange={setNov} />
-      <button type="submit">Confirmar ingreso</button>
-      <Mensaje m={msg} />
-    </form>
-  );
-}
+    <div className="app">
+      <a className="saltar" href="#principal">Saltar al contenido</a>
+      <header className="barra">
+        <p className="marca">Autos Colombia</p>
+        <p className="barra__estado" aria-label={`${r.ocupadas} de ${r.enServicio} celdas ocupadas`}>
+          <span className="barra__cifra">{r.ocupadas}/{r.enServicio}</span> ocupadas
+        </p>
+        <button type="button" className="icono-boton icono-boton--claro" onClick={sinSesion} aria-label="Cerrar sesión">
+          <Icono nombre="salirSesion" />
+        </button>
+      </header>
 
-function Salida({ onCambio }) {
-  const [placa, setPlaca] = useState("");
-  const [nov, setNov] = useState(novedadVacia);
-  const [msg, setMsg] = useState(null);
-
-  async function enviar(e) {
-    e.preventDefault();
-    try {
-      const r = await api.salida({ placa, novedad: aEnvio(nov) });
-      setMsg({ ok: true, texto: `Salida registrada. Permanencia: ${r.minutos} min.` });
-      setPlaca(""); setNov(novedadVacia); onCambio();
-    } catch (err) { setMsg({ ok: false, texto: err.message }); }
-  }
-
-  return (
-    <form onSubmit={enviar}>
-      <h2>Registrar salida</h2>
-      <label>Placa
-        <input value={placa} onChange={(e) => setPlaca(e.target.value)} placeholder="ABC123" maxLength={8} required autoCapitalize="characters" />
-      </label>
-      <CampoNovedad valor={nov} onChange={setNov} />
-      <button type="submit">Confirmar salida</button>
-      <Mensaje m={msg} />
-    </form>
-  );
-}
-
-function Novedad() {
-  const [placa, setPlaca] = useState("");
-  const [nov, setNov] = useState(novedadVacia);
-  const [msg, setMsg] = useState(null);
-
-  async function enviar(e) {
-    e.preventDefault();
-    try {
-      await api.novedad({ placa, ...nov });
-      setMsg({ ok: true, texto: "Novedad registrada." });
-      setPlaca(""); setNov(novedadVacia);
-    } catch (err) { setMsg({ ok: false, texto: err.message }); }
-  }
-
-  return (
-    <form onSubmit={enviar}>
-      <h2>Registrar novedad</h2>
-      <label>Placa del vehículo dentro
-        <input value={placa} onChange={(e) => setPlaca(e.target.value)} placeholder="ABC123" maxLength={8} required autoCapitalize="characters" />
-      </label>
-      <CampoNovedad valor={nov} onChange={setNov} />
-      <button type="submit">Guardar novedad</button>
-      <Mensaje m={msg} />
-    </form>
-  );
-}
-
-function Estado({ activos, todas }) {
-  const hora = (s) => new Date(s).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
-  return (
-    <section>
-      <h2>Vehículos dentro ({activos.length})</h2>
-      {activos.length === 0 ? <p className="vacio">No hay vehículos dentro.</p> : (
-        <ul className="tarjetas">
-          {activos.map((a) => (
-            <li key={a.id_registro}>
-              <span><strong>{a.placa}</strong> · celda {a.celda}</span>
-              <small>{a.cliente} · desde {hora(a.fecha_entrada)}</small>
+      <nav className="nav" aria-label="Secciones">
+        <ul>
+          {VISTAS.map((v) => (
+            <li key={v.id} className={v.soloMovil ? "solo-movil" : undefined}>
+              <button type="button" className="nav__item" aria-current={vista === v.id ? "page" : undefined} onClick={() => setVista(v.id)}>
+                <Icono nombre={v.icono} tamano={22} /><span>{v.texto}</span>
+              </button>
             </li>
           ))}
         </ul>
-      )}
-      <h2>Celdas</h2>
-      <ul className="celdas">
-        {todas.map((c) => <li key={c.id_celda} className={c.estado.toLowerCase()}>{c.codigo}<small>{c.estado.toLowerCase()}</small></li>)}
-      </ul>
-    </section>
+        <button type="button" className="nav__salir" onClick={sinSesion}><Icono nombre="salirSesion" tamano={20} /><span>Cerrar sesión</span></button>
+      </nav>
+
+      <main id="principal" className="contenido">
+        {!enLinea && <p className="aviso" role="status"><Icono nombre="sinConexion" tamano={18} /> Sin conexión. Los registros se guardan cuando vuelva la red.</p>}
+        <div className="contenido__rejilla">
+          <div className={`columna columna--accion${vista === "patio" ? " oculta-movil" : ""}`}>
+            {vista === "ingreso" && <Ingreso celdas={celdas} alRegistrar={refrescar} />}
+            {vista === "salida" && <Salida activos={activos} ahora={ahora} alRegistrar={refrescar} />}
+            {vista === "novedad" && <Novedad activos={activos} ahora={ahora} />}
+          </div>
+          <div className={`columna columna--patio${vista === "patio" ? "" : " oculta-movil"}`}>{patio}</div>
+        </div>
+      </main>
+    </div>
   );
 }
 
 export default function App() {
-  const [vista, setVista] = useState("ingreso");
-  const [todas, setTodas] = useState([]);
-  const [activos, setActivos] = useState([]);
-  const [error, setError] = useState("");
-  const [token, setTok] = useState(sessionStorage.getItem("token") || "");
+  const [autenticado, setAutenticado] = useState(Boolean(sesion.leer()));
+  const [aviso, setAviso] = useState("");
 
-  const cargar = useCallback(async () => {
-    try {
-      const [c, a] = await Promise.all([api.celdas(), api.activos()]);
-      setTodas(c); setActivos(a); setError("");
-    } catch (e) { setError(e.message); }
-  }, []);
+  const salir = useCallback((mensaje = "") => { sesion.borrar(); setAviso(mensaje); setAutenticado(false); }, []);
+  useEffect(() => { configurar({ onNoAutorizado: () => salir("La sesión terminó. Escriba la clave de nuevo.") }); }, [salir]);
 
-  useEffect(() => { cargar(); }, [cargar, token]);
-
-  const disponibles = todas.filter((c) => c.estado === "DISPONIBLE");
-  const vistas = [["ingreso", "Ingreso"], ["salida", "Salida"], ["novedad", "Novedad"], ["estado", "Estado"]];
-
-  return (
-    <div className="app">
-      <header>
-        <h1>Autos Colombia</h1>
-        <input
-          className="token" type="password" placeholder="Clave de acceso" value={token}
-          onChange={(e) => { setTok(e.target.value); setToken(e.target.value); }}
-          aria-label="Clave de acceso"
-        />
-      </header>
-      {error && <p className="msg error" role="alert">{error}</p>}
-      <main>
-        {vista === "ingreso" && <Ingreso celdas={disponibles} onCambio={cargar} />}
-        {vista === "salida" && <Salida onCambio={cargar} />}
-        {vista === "novedad" && <Novedad />}
-        {vista === "estado" && <Estado activos={activos} todas={todas} />}
-      </main>
-      <nav>
-        {vistas.map(([k, t]) => (
-          <button key={k} className={vista === k ? "activa" : ""} onClick={() => { setVista(k); cargar(); }}>{t}</button>
-        ))}
-      </nav>
-    </div>
-  );
+  return autenticado
+    ? <Tablero sinSesion={() => salir()} />
+    : <Login aviso={aviso} onEntrar={() => { setAviso(""); setAutenticado(true); }} />;
 }

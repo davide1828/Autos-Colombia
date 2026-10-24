@@ -28,6 +28,24 @@ type NovedadEntrada struct {
 	Descripcion string             `json:"descripcion"`
 }
 
+// ResultadoIngreso es lo que el encargado necesita ver tras registrar un ingreso.
+type ResultadoIngreso struct {
+	Registro *domain.Registro
+	Placa    string
+	Celda    string // código de la celda (ej. A-01)
+}
+
+// ResultadoSalida incluye el tiempo de permanencia.
+type ResultadoSalida struct {
+	Registro *domain.Registro
+	Placa    string
+	Celda    string
+	Minutos  int
+}
+
+// ZonaColombia: Colombia no tiene horario de verano, UTC-5 todo el año.
+var ZonaColombia = time.FixedZone("COT", -5*60*60)
+
 type Servicio struct {
 	repo  Repositorio
 	ahora func() time.Time
@@ -52,7 +70,7 @@ func (s *Servicio) novedad(in *NovedadEntrada, m domain.MomentoNovedad, vehiculo
 }
 
 // RegistrarIngreso — RF-01, RF-02, RF-05.
-func (s *Servicio) RegistrarIngreso(ctx context.Context, placa string, celdaID int, nov *NovedadEntrada) (*domain.Registro, error) {
+func (s *Servicio) RegistrarIngreso(ctx context.Context, placa string, celdaID int, nov *NovedadEntrada) (*ResultadoIngreso, error) {
 	placa, err := domain.NormalizarPlaca(placa)
 	if err != nil {
 		return nil, err
@@ -62,7 +80,8 @@ func (s *Servicio) RegistrarIngreso(ctx context.Context, placa string, celdaID i
 		return nil, err
 	}
 	ahora := s.ahora()
-	ok, err := s.repo.MensualidadVigente(ctx, v.ClienteID, ahora)
+	// La vigencia de la mensualidad se evalúa con el día calendario de Colombia, no con el de UTC.
+	ok, err := s.repo.MensualidadVigente(ctx, v.ClienteID, ahora.In(ZonaColombia))
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +113,11 @@ func (s *Servicio) RegistrarIngreso(ctx context.Context, placa string, celdaID i
 	if err := s.repo.GuardarIngreso(ctx, r, n); err != nil {
 		return nil, err
 	}
-	return r, nil
+	return &ResultadoIngreso{Registro: r, Placa: v.Placa, Celda: c.Codigo}, nil
 }
 
 // RegistrarSalida — RF-03.
-func (s *Servicio) RegistrarSalida(ctx context.Context, placa string, nov *NovedadEntrada) (*domain.Registro, error) {
+func (s *Servicio) RegistrarSalida(ctx context.Context, placa string, nov *NovedadEntrada) (*ResultadoSalida, error) {
 	placa, err := domain.NormalizarPlaca(placa)
 	if err != nil {
 		return nil, err
@@ -118,12 +137,16 @@ func (s *Servicio) RegistrarSalida(ctx context.Context, placa string, nov *Noved
 	if err != nil {
 		return nil, err
 	}
+	celda, err := s.repo.Celda(ctx, r.CeldaID)
+	if err != nil {
+		return nil, err
+	}
 	ahora := s.ahora()
 	r.Salida = &ahora
 	if err := s.repo.GuardarSalida(ctx, r, n); err != nil {
 		return nil, err
 	}
-	return r, nil
+	return &ResultadoSalida{Registro: r, Placa: v.Placa, Celda: celda.Codigo, Minutos: int(r.Duracion(ahora).Minutes())}, nil
 }
 
 // RegistrarNovedad — RF-04: novedad sobre un vehículo que está dentro.

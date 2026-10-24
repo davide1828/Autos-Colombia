@@ -3,194 +3,202 @@ package application_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"autoscolombia/parqueadero/internal/adapters/memory"
 	"autoscolombia/parqueadero/internal/application"
 	"autoscolombia/parqueadero/internal/domain"
 )
 
-// repoMemoria es un doble de prueba del puerto Repositorio.
-type repoMemoria struct {
-	vehiculos map[string]*domain.Vehiculo
-	vigentes  map[int]bool
-	celdas    map[int]*domain.Celda
-	activos   map[int]*domain.Registro // por vehículo
-	novedades []domain.Novedad
-	sig       int
+var ctx = context.Background()
+
+// Datos de prueba: cliente 1 con mensualidad vigente, cliente 2 vencida.
+func nuevoEscenario(t *testing.T, ahora time.Time) (*application.Servicio, *memory.Repo) {
+	t.Helper()
+	r := memory.Nuevo()
+	r.AgregarCliente(1, "Carlos Gómez", "2026-10-31")
+	r.AgregarCliente(2, "Marta Rojas", "2026-09-01")
+	r.AgregarVehiculo(domain.Vehiculo{ID: 1, Placa: "ABC123", Tipo: domain.Carro, ClienteID: 1})
+	r.AgregarVehiculo(domain.Vehiculo{ID: 2, Placa: "DEF456", Tipo: domain.Carro, ClienteID: 2})
+	r.AgregarVehiculo(domain.Vehiculo{ID: 3, Placa: "XYZ98A", Tipo: domain.Moto, ClienteID: 1})
+	r.AgregarVehiculo(domain.Vehiculo{ID: 4, Placa: "GHI789", Tipo: domain.Carro, ClienteID: 1})
+	r.AgregarCelda(domain.Celda{ID: 1, Codigo: "A-01", Tipo: domain.Carro, Estado: domain.CeldaDisponible})
+	r.AgregarCelda(domain.Celda{ID: 2, Codigo: "A-02", Tipo: domain.Carro, Estado: domain.CeldaOcupada})
+	r.AgregarCelda(domain.Celda{ID: 3, Codigo: "M-01", Tipo: domain.Moto, Estado: domain.CeldaDisponible})
+	r.AgregarCelda(domain.Celda{ID: 4, Codigo: "A-03", Tipo: domain.Carro, Estado: domain.CeldaInactiva})
+	r.AgregarCelda(domain.Celda{ID: 5, Codigo: "A-04", Tipo: domain.Carro, Estado: domain.CeldaDisponible})
+	return application.NuevoServicio(r, func() time.Time { return ahora }), r
 }
 
-func nuevoRepo() *repoMemoria {
-	return &repoMemoria{
-		vehiculos: map[string]*domain.Vehiculo{
-			"ABC123": {ID: 1, Placa: "ABC123", Tipo: domain.Carro, ClienteID: 1},
-			"DEF456": {ID: 2, Placa: "DEF456", Tipo: domain.Carro, ClienteID: 2},
-			"XYZ98A": {ID: 3, Placa: "XYZ98A", Tipo: domain.Moto, ClienteID: 1},
-		},
-		vigentes: map[int]bool{1: true, 2: false},
-		celdas: map[int]*domain.Celda{
-			1: {ID: 1, Codigo: "A-01", Tipo: domain.Carro, Estado: domain.CeldaDisponible},
-			2: {ID: 2, Codigo: "A-02", Tipo: domain.Carro, Estado: domain.CeldaOcupada},
-			3: {ID: 3, Codigo: "M-01", Tipo: domain.Moto, Estado: domain.CeldaDisponible},
-		},
-		activos: map[int]*domain.Registro{},
-	}
-}
+var mediodia = time.Date(2026, 10, 18, 17, 0, 0, 0, time.UTC) // 12:00 en Colombia
 
-func (r *repoMemoria) VehiculoPorPlaca(_ context.Context, p string) (*domain.Vehiculo, error) {
-	if v, ok := r.vehiculos[p]; ok {
-		return v, nil
+func TestIngresoValido_OcupaCeldaYDevuelveDatos(t *testing.T) {
+	s, r := nuevoEscenario(t, mediodia)
+	res, err := s.RegistrarIngreso(ctx, " abc-123 ", 1, nil)
+	if err != nil {
+		t.Fatalf("esperaba ingreso exitoso: %v", err)
 	}
-	return nil, domain.ErrVehiculoNoRegistrado
-}
-func (r *repoMemoria) MensualidadVigente(_ context.Context, c int, _ time.Time) (bool, error) {
-	return r.vigentes[c], nil
-}
-func (r *repoMemoria) Celda(_ context.Context, id int) (*domain.Celda, error) {
-	if c, ok := r.celdas[id]; ok {
-		return c, nil
+	if res.Registro.ID == 0 || res.Placa != "ABC123" || res.Celda != "A-01" {
+		t.Fatalf("resultado inesperado: %+v", res)
 	}
-	return nil, domain.ErrCeldaNoExiste
-}
-func (r *repoMemoria) RegistroActivoDeVehiculo(_ context.Context, v int) (*domain.Registro, error) {
-	return r.activos[v], nil
-}
-func (r *repoMemoria) GuardarIngreso(_ context.Context, g *domain.Registro, n *domain.Novedad) error {
-	r.sig++
-	g.ID = r.sig
-	r.activos[g.VehiculoID] = g
-	r.celdas[g.CeldaID].Estado = domain.CeldaOcupada
-	if n != nil {
-		n.RegistroID = g.ID
-		r.novedades = append(r.novedades, *n)
-	}
-	return nil
-}
-func (r *repoMemoria) GuardarSalida(_ context.Context, g *domain.Registro, n *domain.Novedad) error {
-	delete(r.activos, g.VehiculoID)
-	r.celdas[g.CeldaID].Estado = domain.CeldaDisponible
-	if n != nil {
-		n.RegistroID = g.ID
-		r.novedades = append(r.novedades, *n)
-	}
-	return nil
-}
-func (r *repoMemoria) GuardarNovedad(_ context.Context, n *domain.Novedad) error {
-	r.novedades = append(r.novedades, *n)
-	return nil
-}
-func (r *repoMemoria) Celdas(context.Context, string) ([]domain.Celda, error) { return nil, nil }
-func (r *repoMemoria) RegistrosActivos(context.Context) ([]domain.RegistroDetalle, error) {
-	return nil, nil
-}
-
-func servicio(r *repoMemoria) *application.Servicio {
-	fijo := time.Date(2026, 10, 18, 8, 0, 0, 0, time.UTC)
-	return application.NuevoServicio(r, func() time.Time { return fijo })
-}
-
-func TestIngresoValido_OcupaCelda(t *testing.T) {
-	r := nuevoRepo()
-	reg, err := servicio(r).RegistrarIngreso(context.Background(), " abc-123 ", 1, nil)
-	if err != nil || reg.ID == 0 {
-		t.Fatalf("esperaba ingreso exitoso, err=%v", err)
-	}
-	if r.celdas[1].Estado != domain.CeldaOcupada {
+	if r.EstadoCelda(1) != domain.CeldaOcupada {
 		t.Fatal("la celda debía quedar ocupada")
 	}
 }
 
 func TestIngresoRechazos(t *testing.T) {
 	casos := []struct {
-		nombre  string
-		placa   string
-		celda   int
-		prepara func(*repoMemoria)
-		quiere  error
+		nombre string
+		placa  string
+		celda  int
+		antes  func(*application.Servicio)
+		quiere error
 	}{
 		{"placa inválida", "12", 1, nil, domain.ErrPlacaInvalida},
 		{"vehículo no registrado", "ZZZ999", 1, nil, domain.ErrVehiculoNoRegistrado},
 		{"mensualidad vencida", "DEF456", 1, nil, domain.ErrMensualidadVencida},
-		{"vehículo ya dentro", "ABC123", 1, func(r *repoMemoria) { r.activos[1] = &domain.Registro{ID: 9, VehiculoID: 1, CeldaID: 2} }, domain.ErrVehiculoYaDentro},
+		{"vehículo ya dentro", "ABC123", 5, func(s *application.Servicio) { _, _ = s.RegistrarIngreso(ctx, "ABC123", 1, nil) }, domain.ErrVehiculoYaDentro},
 		{"celda inexistente", "ABC123", 99, nil, domain.ErrCeldaNoExiste},
 		{"celda ocupada", "ABC123", 2, nil, domain.ErrCeldaNoDisponible},
+		{"celda inactiva", "ABC123", 4, nil, domain.ErrCeldaNoDisponible},
 		{"celda de otro tipo", "ABC123", 3, nil, domain.ErrCeldaIncompatible},
 	}
 	for _, c := range casos {
 		t.Run(c.nombre, func(t *testing.T) {
-			r := nuevoRepo()
-			if c.prepara != nil {
-				c.prepara(r)
+			s, r := nuevoEscenario(t, mediodia)
+			if c.antes != nil {
+				c.antes(s)
 			}
-			_, err := servicio(r).RegistrarIngreso(context.Background(), c.placa, c.celda, nil)
+			activosAntes, _ := r.RegistrosActivos(ctx)
+			_, err := s.RegistrarIngreso(ctx, c.placa, c.celda, nil)
 			if !errors.Is(err, c.quiere) {
 				t.Fatalf("esperaba %v, obtuve %v", c.quiere, err)
 			}
-			if len(r.activos) > 0 && c.nombre != "vehículo ya dentro" {
+			if despues, _ := r.RegistrosActivos(ctx); len(despues) != len(activosAntes) {
 				t.Fatal("un rechazo no debe crear registros")
 			}
 		})
 	}
 }
 
+// Regresión: a las 8 p. m. en Colombia ya es "mañana" en UTC, pero la mensualidad
+// que vence hoy sigue vigente.
+func TestMensualidadSeEvaluaConElDiaDeColombia(t *testing.T) {
+	ultimoDia := time.Date(2026, 11, 1, 1, 30, 0, 0, time.UTC) // 31-oct 20:30 en Colombia = 1-nov en UTC
+	s, _ := nuevoEscenario(t, ultimoDia)
+	if _, err := s.RegistrarIngreso(ctx, "ABC123", 1, nil); err != nil {
+		t.Fatalf("el último día de la mensualidad debía permitir el ingreso: %v", err)
+	}
+	siguiente := time.Date(2026, 11, 1, 6, 0, 0, 0, time.UTC) // 1-nov 01:00 en Colombia
+	s2, _ := nuevoEscenario(t, siguiente)
+	if _, err := s2.RegistrarIngreso(ctx, "ABC123", 1, nil); !errors.Is(err, domain.ErrMensualidadVencida) {
+		t.Fatalf("al día siguiente debía estar vencida, obtuve %v", err)
+	}
+}
+
 func TestIngresoConNovedad(t *testing.T) {
-	r := nuevoRepo()
-	_, err := servicio(r).RegistrarIngreso(context.Background(), "ABC123", 1,
-		&application.NovedadEntrada{Tipo: domain.NovedadDanio, Descripcion: "Rayón en la puerta izquierda"})
-	if err != nil || len(r.novedades) != 1 || r.novedades[0].Momento != domain.MomentoEntrada {
-		t.Fatalf("la novedad de entrada no se guardó bien: %v %+v", err, r.novedades)
+	s, r := nuevoEscenario(t, mediodia)
+	_, err := s.RegistrarIngreso(ctx, "ABC123", 1, &application.NovedadEntrada{Tipo: domain.NovedadDanio, Descripcion: "Rayón en la puerta izquierda"})
+	nov := r.Novedades()
+	if err != nil || len(nov) != 1 || nov[0].Momento != domain.MomentoEntrada || nov[0].RegistroID == 0 {
+		t.Fatalf("la novedad de entrada no se guardó bien: %v %+v", err, nov)
 	}
 }
 
-func TestIngresoNovedadInvalida_NoRegistra(t *testing.T) {
-	r := nuevoRepo()
-	_, err := servicio(r).RegistrarIngreso(context.Background(), "ABC123", 1,
-		&application.NovedadEntrada{Tipo: domain.NovedadDanio, Descripcion: "  "})
-	if !errors.Is(err, domain.ErrNovedadInvalida) || len(r.activos) != 0 {
-		t.Fatalf("esperaba rechazo sin registro, err=%v", err)
+func TestIngresoNovedadInvalida_NoRegistraNiOcupaCelda(t *testing.T) {
+	s, r := nuevoEscenario(t, mediodia)
+	_, err := s.RegistrarIngreso(ctx, "ABC123", 1, &application.NovedadEntrada{Tipo: domain.NovedadDanio, Descripcion: "  "})
+	if !errors.Is(err, domain.ErrNovedadInvalida) || r.EstadoCelda(1) != domain.CeldaDisponible {
+		t.Fatalf("esperaba rechazo sin efectos, err=%v", err)
 	}
 }
 
-func TestSalida_LiberaCelda(t *testing.T) {
-	r := nuevoRepo()
-	s := servicio(r)
-	if _, err := s.RegistrarIngreso(context.Background(), "ABC123", 1, nil); err != nil {
+func TestSalida_LiberaCeldaYCalculaPermanencia(t *testing.T) {
+	reloj := mediodia
+	r := memory.Nuevo()
+	r.AgregarCliente(1, "Carlos", "2026-10-31")
+	r.AgregarVehiculo(domain.Vehiculo{ID: 1, Placa: "ABC123", Tipo: domain.Carro, ClienteID: 1})
+	r.AgregarCelda(domain.Celda{ID: 1, Codigo: "A-01", Tipo: domain.Carro, Estado: domain.CeldaDisponible})
+	s := application.NuevoServicio(r, func() time.Time { return reloj })
+
+	if _, err := s.RegistrarIngreso(ctx, "ABC123", 1, nil); err != nil {
 		t.Fatal(err)
 	}
-	reg, err := s.RegistrarSalida(context.Background(), "ABC123", nil)
-	if err != nil || reg.Salida == nil {
+	reloj = reloj.Add(95 * time.Minute)
+	res, err := s.RegistrarSalida(ctx, "ABC123", &application.NovedadEntrada{Tipo: domain.NovedadFaltante, Descripcion: "Falta el espejo"})
+	if err != nil {
 		t.Fatalf("salida falló: %v", err)
 	}
-	if r.celdas[1].Estado != domain.CeldaDisponible {
+	if res.Minutos != 95 || res.Celda != "A-01" || res.Registro.Salida == nil {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+	if r.EstadoCelda(1) != domain.CeldaDisponible {
 		t.Fatal("la celda debía quedar disponible")
+	}
+	if n := r.Novedades(); len(n) != 1 || n[0].Momento != domain.MomentoSalida {
+		t.Fatalf("novedad de salida no guardada: %+v", n)
 	}
 }
 
 func TestSalidaSinIngreso(t *testing.T) {
-	_, err := servicio(nuevoRepo()).RegistrarSalida(context.Background(), "ABC123", nil)
-	if !errors.Is(err, domain.ErrSinIngresoActivo) {
+	s, _ := nuevoEscenario(t, mediodia)
+	if _, err := s.RegistrarSalida(ctx, "ABC123", nil); !errors.Is(err, domain.ErrSinIngresoActivo) {
 		t.Fatalf("esperaba ErrSinIngresoActivo, obtuve %v", err)
 	}
 }
 
 func TestNovedadDuranteEstancia(t *testing.T) {
-	r := nuevoRepo()
-	s := servicio(r)
-	_, err := s.RegistrarNovedad(context.Background(), "ABC123", application.NovedadEntrada{Tipo: domain.NovedadOtra, Descripcion: "Alarma sonando"})
-	if !errors.Is(err, domain.ErrSinIngresoActivo) {
+	s, r := nuevoEscenario(t, mediodia)
+	nov := application.NovedadEntrada{Tipo: domain.NovedadOtra, Descripcion: "Alarma sonando"}
+	if _, err := s.RegistrarNovedad(ctx, "ABC123", nov); !errors.Is(err, domain.ErrSinIngresoActivo) {
 		t.Fatalf("sin ingreso activo debía rechazar, obtuve %v", err)
 	}
-	_, _ = s.RegistrarIngreso(context.Background(), "ABC123", 1, nil)
-	n, err := s.RegistrarNovedad(context.Background(), "ABC123", application.NovedadEntrada{Tipo: domain.NovedadOtra, Descripcion: "Alarma sonando"})
-	if err != nil || n.Momento != domain.MomentoEstancia {
-		t.Fatalf("novedad no registrada: %v", err)
+	_, _ = s.RegistrarIngreso(ctx, "ABC123", 1, nil)
+	n, err := s.RegistrarNovedad(ctx, "ABC123", nov)
+	if err != nil || n.Momento != domain.MomentoEstancia || n.RegistroID == 0 {
+		t.Fatalf("novedad no registrada: %v %+v", err, n)
+	}
+	if len(r.Novedades()) != 1 {
+		t.Fatal("la novedad debía quedar guardada")
 	}
 }
 
-func TestDuracionRegistro(t *testing.T) {
-	ent := time.Date(2026, 10, 18, 8, 0, 0, 0, time.UTC)
-	sal := ent.Add(90 * time.Minute)
-	if d := (domain.Registro{Entrada: ent, Salida: &sal}).Duracion(sal); d != 90*time.Minute {
-		t.Fatalf("duración incorrecta: %v", d)
+func TestConsultas(t *testing.T) {
+	s, _ := nuevoEscenario(t, mediodia)
+	disp, _ := s.ConsultarCeldas(ctx, "DISPONIBLE")
+	if len(disp) != 3 {
+		t.Fatalf("esperaba 3 celdas disponibles, hubo %d", len(disp))
+	}
+	_, _ = s.RegistrarIngreso(ctx, "ABC123", 1, nil)
+	dentro, _ := s.VehiculosDentro(ctx)
+	if len(dentro) != 1 || dentro[0].Placa != "ABC123" || dentro[0].Cliente != "Carlos Gómez" || dentro[0].Celda != "A-01" {
+		t.Fatalf("vehículos dentro inesperados: %+v", dentro)
+	}
+}
+
+// Concurrencia: dos encargados intentan ocupar la misma celda a la vez; solo uno lo logra.
+func TestIngresoConcurrente_UnaSolaCelda(t *testing.T) {
+	s, r := nuevoEscenario(t, mediodia)
+	r.AgregarVehiculo(domain.Vehiculo{ID: 5, Placa: "JKL012", Tipo: domain.Carro, ClienteID: 1})
+	placas := []string{"ABC123", "GHI789", "JKL012"}
+	var wg sync.WaitGroup
+	var exitos atomic.Int32
+	for _, p := range placas {
+		wg.Add(1)
+		go func(placa string) {
+			defer wg.Done()
+			if _, err := s.RegistrarIngreso(ctx, placa, 1, nil); err == nil {
+				exitos.Add(1)
+			} else if !errors.Is(err, domain.ErrCeldaNoDisponible) {
+				t.Errorf("error inesperado: %v", err)
+			}
+		}(p)
+	}
+	wg.Wait()
+	if exitos.Load() != 1 {
+		t.Fatalf("solo un ingreso debía lograrse, hubo %d", exitos.Load())
 	}
 }

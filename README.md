@@ -10,25 +10,34 @@ Aplicación web responsive (PWA) para celulares, tablets y computadores.
 ## Ejecutar
 
 ```bash
-# 1. Base de datos (opción Docker)
+# 1. Base de datos (Docker)
 docker compose up -d db
 
-# 2. Frontend (genera backend/static)
-cd frontend && npm install && npm run build && cp -r dist ../backend/static && cd ..
+# 2. Compilar el frontend dentro del backend
+make build            # o: cd frontend && npm ci && npm run build && cp -r dist ../backend/static
 
-# 3. API + frontend en http://localhost:8080
-cd backend
-API_TOKEN=cambiar-esta-clave go run ./cmd/api
+# 3. API + frontend en http://localhost:8080  (API_TOKEN: mínimo 16 caracteres)
+cd backend && API_TOKEN=una-clave-larga-123 go run ./cmd/api
 ```
 
-Variables de entorno: `DATABASE_URL`, `API_TOKEN`, `PORT` (8080), `STATIC_DIR` (./static).
-Usuario de prueba: ingrese la clave `API_TOKEN` en el campo "Clave de acceso" de la app.
+Todo en contenedores: `API_TOKEN=una-clave-larga-123 docker compose --profile app up --build`.
 
-## Pruebas
+Variables: `API_TOKEN` (obligatoria), `DATABASE_URL`, `PORT` (8080), `STATIC_DIR` (./static).
+La API **no arranca sin `API_TOKEN`** (solo con `ALLOW_INSECURE_NO_AUTH=true`, para desarrollo local).
+Al abrir la app, escriba esa clave en la pantalla de acceso.
+
+## Calidad
 
 ```bash
-cd backend && go test ./...
+make lint      # gofmt, go vet, eslint
+make test      # backend con -race + frontend (vitest)
+make test-integration   # incluye PostgreSQL real (use una base DESECHABLE)
 ```
+
+- Backend: arquitectura hexagonal; pruebas de dominio, casos de uso, API HTTP, configuración y PostgreSQL (incluye carrera de concurrencia y restricciones de la base).
+- Seguridad: clave obligatoria y comparada en tiempo constante, límite de intentos fallidos, cabeceras de seguridad (CSP, X-Frame-Options…), tiempos de espera del servidor, cierre ordenado, consultas parametrizadas.
+- Zona horaria: la vigencia de la mensualidad se evalúa con el día calendario de Colombia (UTC-5).
+- Frontend: React sin librerías de UI; accesible (etiquetas, foco visible, `aria-live`, no depende solo del color), responsive de 320 px a escritorio.
 
 ## API
 
@@ -39,6 +48,7 @@ cd backend && go test ./...
 | POST | `/api/novedades` | Registra una novedad `{placa, tipo, descripcion}` |
 | GET | `/api/celdas?estado=DISPONIBLE` | Consulta celdas |
 | GET | `/api/registros/activos` | Vehículos dentro |
+| GET | `/api/sesion` | Valida la clave de acceso |
 
 Todas exigen `Authorization: Bearer <API_TOKEN>`.
 

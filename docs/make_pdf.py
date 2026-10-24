@@ -75,7 +75,7 @@ def pie(c, d):
     c.setStrokeColor(BORDE); c.line(2.2 * cm, 1.6 * cm, letter[0] - 2.2 * cm, 1.6 * cm); c.restoreState()
 
 def portada(c, d):
-    c.saveState(); c.setFillColor(AZUL); c.rect(0, letter[1] - 7.5 * cm, letter[0], 7.5 * cm, fill=1, stroke=0); c.restoreState()
+    c.saveState(); c.setFillColor(AZUL); c.rect(0, letter[1] - 9 * cm, letter[0], 9 * cm, fill=1, stroke=0); c.restoreState()
 
 doc = BaseDocTemplate(SALIDA, pagesize=letter, leftMargin=2.2 * cm, rightMargin=2.2 * cm, topMargin=2.2 * cm, bottomMargin=2.2 * cm,
                       title="Sistema de información del parqueadero Autos Colombia - EA1", author=NOMBRE)
@@ -85,15 +85,15 @@ doc.addPageTemplates([PageTemplate("portada", [fr], onPage=portada), PageTemplat
 E = []
 # ---------- PORTADA ----------
 E += [Spacer(1, 1.2 * cm),
-      P("EVIDENCIA DE APRENDIZAJE 1", S("p0", fontName="DV-B", fontSize=11, textColor=colors.white, leading=14)),
+      P("S20 · EVIDENCIA DE APRENDIZAJE 1", S("p0", fontName="DV-B", fontSize=11, textColor=colors.white, leading=14)),
       Spacer(1, 6),
       P("Sistema de información del parqueadero “Autos Colombia”", S("p1", fontName="DV-B", fontSize=22, leading=28, textColor=colors.white)),
       Spacer(1, 8),
-      P("Iteración 1: Gestión de la entrada y salida de vehículos", S("p2", fontSize=13, leading=18, textColor=colors.white)),
-      Spacer(1, 5.2 * cm)]
+      P("Diseño de Sistema de Información – Iteración 1: Gestión de la entrada y salida de vehículos", S("p2", fontSize=13, leading=18, textColor=colors.white)),
+      Spacer(1, 4.4 * cm)]
 datos = [["Estudiante", NOMBRE], ["Programa", "Tecnología en Desarrollo de Software"], ["Institución", "IU Digital de Antioquia"],
          ["Asignatura", MATERIA or "______________________________"], ["Docente", DOCENTE or "______________________________"],
-         ["Ciudad y fecha", "Medellín, Colombia · 18 de octubre de 2026"]]
+         ["Ciudad y fecha", "Medellín, Colombia · 21 de octubre de 2026"]]
 t = Table([[P("<b>%s</b>" % a, S("pc", fontSize=10.5)), P(b, S("pc2", fontSize=10.5))] for a, b in datos], colWidths=[4 * cm, W - 4 * cm])
 t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, BORDE), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
 E += [t, NextPageTemplate("normal"), PageBreak()]
@@ -217,22 +217,22 @@ E += [P("3. Arquitectura del sistema", h2),
 E += [P("4. Mockups de las historias de usuario", h2),
  P("Los mockups muestran la apariencia visual (tipografía, color y jerarquía) de las pantallas asociadas a las historias de usuario. La interfaz se diseñó pensando primero en el "
    "celular: formularios de una sola columna, botones grandes y navegación inferior con las cuatro acciones del encargado (Ingreso, Salida, Novedad y Estado). Cada pantalla "
-   "muestra los datos, las acciones y los mensajes que el usuario necesita para saber qué ocurrió y cómo continuar. Las imágenes son capturas del prototipo; los mockups editables se encuentran en Figma."),
+   "muestra los datos, las acciones y los mensajes que el usuario necesita para saber qué ocurrió y cómo continuar. Las imágenes son capturas del prototipo funcional; los mockups editables se encuentran en Figma."),
  P("Archivo en Figma: %s" % (FIGMA or "[pegar aquí el enlace del archivo de Figma]"), S("fg", fontName="DV-B", fontSize=9)), Spacer(1, 4)]
 def fila_pantallas(items):
     celdas = [[img(PT + f, 3.6 * cm, 7.2 * cm), P(c, cap)] for f, c in items]
     t = Table([[x[0] for x in celdas], [x[1] for x in celdas]], colWidths=[W / len(celdas)] * len(celdas))
     t.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, 0), "TOP")])); return t
-E += [fila_pantallas([("01_ingreso.png", "HU-01 · Registrar ingreso (formulario con datos, celda y novedad opcional)"),
-                      ("02_ingreso_ok.png", "HU-01 · Mensaje de ingreso exitoso"),
-                      ("03_ingreso_rechazo.png", "HU-01 · Rechazo por mensualidad vencida")]),
+E += [fila_pantallas([("02_ingreso_lleno.png", "HU-01 · Registrar ingreso: placa, celda libre y novedad opcional"),
+                      ("03_ingreso_ok.png", "HU-01 · Ingreso registrado"),
+                      ("04_ingreso_rechazo.png", "HU-01 · Rechazo por mensualidad vencida")]),
       Spacer(1, 6),
-      fila_pantallas([("04_salida.png", "HU-02 · Registrar salida con novedad de faltante"),
-                      ("05_novedad.png", "HU-03 · Registrar novedad de un vehículo dentro"),
-                      ("06_estado.png", "HU-04 y HU-05 · Estado de celdas y vehículos dentro")]),
+      fila_pantallas([("07_salida.png", "HU-02 · Registrar salida eligiendo un vehículo dentro"),
+                      ("06_novedad.png", "HU-03 · Registrar novedad"),
+                      ("05_patio.png", "HU-04 y HU-05 · Patio: celdas y vehículos dentro")]),
       PageBreak(),
       P("Vista en computador (misma aplicación, mismo código)", h3),
-      figura(PT + "07_estado_pc.png", "Figura 2. Vista de estado en pantalla ancha: la aplicación se adapta a tablets y computadores", alto=9.5 * cm),
+      figura(PT + "09_escritorio.png", "Figura 2. Vista de escritorio: formulario y patio a la vez; en tablet se conserva esta disposición", alto=9.5 * cm),
       P("<b>De boceto a mockup y prototipo.</b> El boceto fija la estructura (qué datos y acciones van en cada pantalla); el mockup añade la apariencia visual; el prototipo simula la "
         "interacción y la navegación. Para esta iteración, la interfaz en React funciona como prototipo navegable conectado al backend real.", body),
       Spacer(1, 10)]
@@ -315,9 +315,10 @@ E += [P("9. Código fuente y repositorio", h2),
         ["GET /api/registros/activos", "Vehículos dentro (RF-06)", "200"]],
        [4.6 * cm, 4.4 * cm, W - 9 * cm]),
  P("Verificación realizada", h3),
- P("<b>Pruebas automáticas</b> de los casos de uso (<font name='DVM'>go test ./...</font>): ingreso válido que ocupa la celda; rechazos por placa inválida, vehículo no registrado, "
-   "mensualidad vencida, vehículo ya dentro, celda inexistente, celda ocupada y celda de otro tipo (sin crear registros); ingreso con novedad válida e inválida; salida que libera la celda; "
-   "salida sin ingreso; novedad durante la estancia y cálculo de duración. Resultado: <b>todas las pruebas pasan</b>."),
+ P("<b>Pruebas automáticas del backend</b> (<font name='DVM'>go test -race ./...</font>): dominio, casos de uso, API HTTP, configuración y PostgreSQL real. Cubren el ingreso válido, todos los rechazos "
+   "(placa inválida, vehículo no registrado, mensualidad vencida, vehículo ya dentro, celda ocupada, inactiva o de otro tipo), la salida, las novedades, la zona horaria de Colombia en el último día de la mensualidad, "
+   "la autenticación y el límite de intentos, y una carrera entre varios encargados por la misma celda. Resultado: <b>55 pruebas, 0 fallos</b> (51 sin base de datos; 4 de integración la requieren). "
+   "Cobertura por paquete: dominio y configuración 100 %, API 90 %, aplicación 89 %, persistencia 74 %. En el frontend: 17 pruebas de la lógica de formato y validación, y análisis estático (ESLint) sin errores."),
  P("<b>Prueba de integración</b> contra PostgreSQL real, con peticiones HTTP: acceso sin token (401), ingreso con novedad (201), ingreso repetido (409), celda ocupada (409), "
    "mensualidad vencida (422), celda inactiva (409), celda de otro tipo (422), novedad durante la estancia (201), listado de vehículos dentro, salida con novedad (200), "
    "segunda salida (409) y celda nuevamente disponible. Las tres novedades quedaron guardadas con su momento (ENTRADA, DURANTE_ESTANCIA, SALIDA)."),

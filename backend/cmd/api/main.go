@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
-	"log"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -12,40 +16,79 @@ import (
 	"autoscolombia/parqueadero/internal/adapters/httpapi"
 	"autoscolombia/parqueadero/internal/adapters/postgres"
 	"autoscolombia/parqueadero/internal/application"
+	"autoscolombia/parqueadero/internal/config"
 )
 
-func env(clave, defecto string) string {
-	if v := os.Getenv(clave); v != "" {
-		return v
+func main() {
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if err := ejecutar(log); err != nil {
+		log.Error("la aplicación terminó con error", "error", err)
+		os.Exit(1)
 	}
-	return defecto
 }
 
-func main() {
-	db, err := sql.Open("postgres", env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/parqueadero?sslmode=disable"))
+func ejecutar(log *slog.Logger) error {
+	cfg, err := config.Cargar()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	if err := db.Ping(); err != nil {
-		log.Fatalf("no se pudo conectar a la base de datos: %v", err)
+	if cfg.APIToken == "" {
+		log.Warn("ejecutando SIN autenticación (ALLOW_INSECURE_NO_AUTH): usar solo en desarrollo local")
 	}
+
+	db, err := sql.Open("postgres", cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(30 * time.Minute)
+
+	pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := db.PingContext(pingCtx); err != nil {
+		return errors.Join(errors.New("no se pudo conectar a la base de datos"), err)
+	}
+
 	svc := application.NuevoServicio(postgres.Nuevo(db), time.Now)
-	api := httpapi.Nueva(svc, os.Getenv("API_TOKEN"))
+	api := httpapi.Nueva(svc, cfg.APIToken, log)
 
 	raiz := http.NewServeMux()
 	raiz.Handle("/api/", api.Rutas())
 	raiz.Handle("/healthz", api.Rutas())
-	// Sirve el frontend compilado (React) si existe.
-	if dir := env("STATIC_DIR", "./static"); dirExiste(dir) {
-		raiz.Handle("/", http.FileServer(http.Dir(dir)))
+	if st, err := os.Stat(cfg.StaticDir); err == nil && st.IsDir() {
+		raiz.Handle("/", httpapi.Estaticos(cfg.StaticDir))
 	}
 
-	addr := ":" + env("PORT", "8080")
-	log.Printf("API escuchando en %s", addr)
-	log.Fatal(http.ListenAndServe(addr, raiz))
-}
+	srv := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           httpapi.Envolver(raiz, log),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 16,
+	}
 
-func dirExiste(p string) bool {
-	st, err := os.Stat(p)
-	return err == nil && st.IsDir()
+	ctx, parar := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer parar()
+	errCh := make(chan error, 1)
+	go func() {
+		log.Info("API escuchando", "addr", srv.Addr)
+		errCh <- srv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errCh:
+		if !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+	case <-ctx.Done():
+		log.Info("apagando de forma ordenada")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	}
+	return nil
 }
