@@ -3,4 +3,5 @@ frontend/dist/
 backend/static/
 *.log
 docs/diagramas/plantuml.jar
+docs/plantuml.jar
 .env

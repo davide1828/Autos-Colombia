@@ -5,7 +5,7 @@ Aplicación web responsive (PWA) para celulares, tablets y computadores.
 - **Backend:** Go (arquitectura hexagonal: `domain`, `application`, `adapters/httpapi`, `adapters/postgres`)
 - **Frontend:** React + Vite
 - **Base de datos:** PostgreSQL 16 (`backend/db/schema.sql`, `backend/db/seed.sql`)
-- **Documentación y diagramas:** `docs/` (fuentes PlantUML importables en StarUML + PNG)
+- **Documentación y diagramas:** `docs/` (fuentes PlantUML + PNG; el PDF de la EA1 no usa StarUML)
 
 ## Ejecutar
 
