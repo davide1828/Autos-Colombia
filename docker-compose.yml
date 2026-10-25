@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: parqueadero
-    ports: ["5432:5432"]
+    ports: ["${PGPORT:-5433}:5432"]
     volumes:
       - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
       - ./backend/db/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
