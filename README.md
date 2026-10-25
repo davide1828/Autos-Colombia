@@ -55,3 +55,5 @@ Todas exigen `Authorization: Bearer <API_TOKEN>`.
 ## Mockups
 
 Archivo de Figma: https://www.figma.com/design/DhCeukFFGQef4egiIl3UbY/
+
+Está actualizado al diseño final de la interfaz (25 de octubre de 2026): componentes reutilizables (placa colombiana, selector de celda, bahía del patio, navegación inferior, mensajes, chips y botón), paleta como variables de color (asfalto, papel, placa, libre, ocupada), tipografía Barlow / Barlow Condensed, ocho pantallas para celular (acceso, ingreso diligenciado, ingreso exitoso, rechazo por mensualidad, salida, salida exitosa, novedad y patio), la vista de computador y un prototipo navegable (inicia en la pantalla de acceso).

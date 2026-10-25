@@ -25,6 +25,8 @@ DOCENTE = cfg.get("docente", "")
 MATERIA = cfg.get("materia", "")
 GITHUB = cfg.get("github", "")
 FIGMA = cfg.get("figma", "")
+CODIGO = cfg.get("codigo", "")
+PERIODO = cfg.get("periodo", "")
 NOMBRE = cfg.get("nombre", "Cristian España")
 SALIDA = cfg.get("salida", "/mnt/user-data/outputs/España_Cristian_EA1.pdf")
 
@@ -63,8 +65,10 @@ def img(path, ancho_max, alto_max):
 def figura(path, titulo, ancho=16.4 * cm, alto=15 * cm):
     return KeepTogether([img(path, ancho, alto), Spacer(1, 3), P(titulo, cap)])
 
-DG = "/home/claude/parqueadero/docs/diagramas/"
-PT = "/home/claude/parqueadero/docs/pantallas/"
+import os
+AQUI = os.path.dirname(os.path.abspath(__file__))
+DG = os.path.join(AQUI, "diagramas") + "/"
+PT = os.path.join(AQUI, "pantallas") + "/"
 W = letter[0] - 4.4 * cm
 
 # ---------- encabezado / pie ----------
@@ -92,8 +96,8 @@ E += [Spacer(1, 1.2 * cm),
       P("Diseño de Sistema de Información – Iteración 1: Gestión de la entrada y salida de vehículos", S("p2", fontSize=13, leading=18, textColor=colors.white)),
       Spacer(1, 4.4 * cm)]
 datos = [["Estudiante", NOMBRE], ["Programa", "Tecnología en Desarrollo de Software"], ["Institución", "IU Digital de Antioquia"],
-         ["Asignatura", MATERIA or "______________________________"], ["Docente", DOCENTE or "______________________________"],
-         ["Ciudad y fecha", "Medellín, Colombia · 21 de octubre de 2026"]]
+         ["Asignatura", MATERIA or "______________________________"], ["Código del curso", CODIGO or "______________________________"], ["Periodo", PERIODO or "______________________________"], ["Docente", DOCENTE or "______________________________"],
+         ["Ciudad y fecha", "Medellín, Colombia · 25 de octubre de 2026"]]
 t = Table([[P("<b>%s</b>" % a, S("pc", fontSize=10.5)), P(b, S("pc2", fontSize=10.5))] for a, b in datos], colWidths=[4 * cm, W - 4 * cm])
 t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, BORDE), ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8)]))
 E += [t, NextPageTemplate("normal"), PageBreak()]
@@ -216,8 +220,8 @@ E += [P("3. Arquitectura del sistema", h2),
 # ---------- MOCKUPS ----------
 E += [P("4. Mockups de las historias de usuario", h2),
  P("Los mockups muestran la apariencia visual (tipografía, color y jerarquía) de las pantallas asociadas a las historias de usuario. La interfaz se diseñó pensando primero en el "
-   "celular: formularios de una sola columna, botones grandes y navegación inferior con las cuatro acciones del encargado (Ingreso, Salida, Novedad y Estado). Cada pantalla "
-   "muestra los datos, las acciones y los mensajes que el usuario necesita para saber qué ocurrió y cómo continuar. Las imágenes son capturas del prototipo funcional; los mockups editables se encuentran en Figma."),
+   "celular: formularios de una sola columna, botones grandes y navegación inferior con las cuatro acciones del encargado (Ingreso, Salida, Novedad y Patio). Cada pantalla "
+   "muestra los datos, las acciones y los mensajes que el usuario necesita para saber qué ocurrió y cómo continuar. Las imágenes son capturas del prototipo funcional; los mockups editables se encuentran en Figma, donde también están los componentes reutilizables (placa, selector de celda, bahía del patio, navegación y mensajes), la paleta como variables de color, las ocho pantallas para celular, la vista de computador y un prototipo navegable entre ellas."),
  P("Archivo en Figma: %s" % (FIGMA or "[pegar aquí el enlace del archivo de Figma]"), S("fg", fontName="DV-B", fontSize=9)), Spacer(1, 4)]
 def fila_pantallas(items):
     celdas = [[img(PT + f, 3.6 * cm, 7.2 * cm), P(c, cap)] for f, c in items]
