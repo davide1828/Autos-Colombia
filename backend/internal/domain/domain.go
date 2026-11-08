@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type TipoVehiculo string
@@ -51,12 +52,60 @@ var (
 	ErrCeldaIncompatible    = errors.New("la celda no corresponde al tipo de vehículo")
 	ErrSinIngresoActivo     = errors.New("el vehículo no tiene un ingreso activo")
 	ErrNovedadInvalida      = errors.New("la novedad requiere un tipo válido y una descripción")
+
+	// Registro de vehículos (RF-08).
+	ErrPlacaYaRegistrada    = errors.New("la placa ya está registrada en el sistema")
+	ErrTipoVehiculoInvalido = errors.New("el tipo de vehículo debe ser CARRO o MOTO")
+	ErrClienteInvalido      = errors.New("el cliente requiere documento (máx. 20 caracteres) y nombre (máx. 100); el teléfono admite máx. 20")
+	ErrMensualidadInvalida  = errors.New("la mensualidad requiere fechas válidas (AAAA-MM-DD) y la fecha final no puede ser anterior a la inicial")
 )
 
 type Cliente struct {
 	ID        int    `json:"id_cliente"`
 	Documento string `json:"documento"`
 	Nombre    string `json:"nombre"`
+	Telefono  string `json:"telefono,omitempty"`
+}
+
+// NormalizarCliente quita espacios sobrantes y valida los datos obligatorios del cliente.
+func NormalizarCliente(c Cliente) (Cliente, error) {
+	c.Documento = strings.TrimSpace(c.Documento)
+	c.Nombre = strings.Join(strings.Fields(c.Nombre), " ")
+	c.Telefono = strings.TrimSpace(c.Telefono)
+	if c.Documento == "" || c.Nombre == "" ||
+		utf8.RuneCountInString(c.Documento) > 20 || utf8.RuneCountInString(c.Nombre) > 100 || utf8.RuneCountInString(c.Telefono) > 20 {
+		return Cliente{}, ErrClienteInvalido
+	}
+	return c, nil
+}
+
+// Valido indica si el tipo es CARRO o MOTO.
+func (t TipoVehiculo) Valido() bool { return t == Carro || t == Moto }
+
+// Mensualidad es el periodo (días calendario, ambos extremos incluidos) en que el cliente puede usar el parqueadero.
+type Mensualidad struct {
+	ID        int       `json:"id_mensualidad"`
+	ClienteID int       `json:"id_cliente"`
+	Inicio    time.Time `json:"fecha_inicio"`
+	Fin       time.Time `json:"fecha_fin"`
+}
+
+const formatoDia = "2006-01-02"
+
+// NuevaMensualidad construye una mensualidad a partir de fechas AAAA-MM-DD y valida el rango.
+func NuevaMensualidad(inicio, fin string) (*Mensualidad, error) {
+	i, err1 := time.Parse(formatoDia, strings.TrimSpace(inicio))
+	f, err2 := time.Parse(formatoDia, strings.TrimSpace(fin))
+	if err1 != nil || err2 != nil || f.Before(i) {
+		return nil, ErrMensualidadInvalida
+	}
+	return &Mensualidad{Inicio: i, Fin: f}, nil
+}
+
+// EstaVigente indica si el día calendario de "dia" está dentro del periodo.
+func (m Mensualidad) EstaVigente(dia time.Time) bool {
+	d := dia.Format(formatoDia)
+	return d >= m.Inicio.Format(formatoDia) && d <= m.Fin.Format(formatoDia)
 }
 
 type Vehiculo struct {

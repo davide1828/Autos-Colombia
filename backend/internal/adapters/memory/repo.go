@@ -14,7 +14,16 @@ type Repo struct {
 	mu        sync.Mutex
 	vehiculos map[string]*domain.Vehiculo
 	clientes  map[int]string // id -> nombre
-	hasta     map[int]string // id cliente -> último día de la mensualidad (yyyy-mm-dd)
+	docs      map[string]int // documento -> id cliente
+	sigCli    int
+	sigVeh    int
+	mens      map[int][]domain.Mensualidad // id cliente -> periodos
+	documento map[int]string               // id cliente -> documento
+	telefono  map[int]string               // id cliente -> teléfono
+	usuarios  map[int]*domain.Usuario
+	sigUsu    int
+	sigMens   int
+	auditoria []domain.Auditoria
 	celdas    map[int]*domain.Celda
 	registros []*domain.Registro
 	novedades []domain.Novedad
@@ -24,17 +33,25 @@ type Repo struct {
 
 func Nuevo() *Repo {
 	return &Repo{
-		vehiculos: map[string]*domain.Vehiculo{}, clientes: map[int]string{},
-		hasta: map[int]string{}, celdas: map[int]*domain.Celda{},
+		vehiculos: map[string]*domain.Vehiculo{}, clientes: map[int]string{}, docs: map[string]int{}, sigCli: 1000, sigVeh: 1000,
+		mens: map[int][]domain.Mensualidad{}, documento: map[int]string{}, telefono: map[int]string{},
+		usuarios: map[int]*domain.Usuario{}, celdas: map[int]*domain.Celda{},
 	}
 }
 
+// AgregarCliente registra un cliente de prueba; mensualidadHasta (AAAA-MM-DD) crea una mensualidad vigente hasta esa fecha.
 func (r *Repo) AgregarCliente(id int, nombre, mensualidadHasta string) {
+	r.AgregarClienteCompleto(id, "DOC"+nombre, nombre, "", mensualidadHasta)
+}
+
+// AgregarClienteCompleto permite fijar documento y teléfono en las pruebas.
+func (r *Repo) AgregarClienteCompleto(id int, documento, nombre, telefono, mensualidadHasta string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.clientes[id] = nombre
+	r.clientes[id], r.documento[id], r.telefono[id], r.docs[documento] = nombre, documento, telefono, id
 	if mensualidadHasta != "" {
-		r.hasta[id] = mensualidadHasta
+		fin, _ := time.Parse("2006-01-02", mensualidadHasta)
+		r.mens[id] = append(r.mens[id], domain.Mensualidad{ClienteID: id, Inicio: time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC), Fin: fin})
 	}
 }
 
@@ -77,8 +94,12 @@ func (r *Repo) VehiculoPorPlaca(_ context.Context, placa string) (*domain.Vehicu
 func (r *Repo) MensualidadVigente(_ context.Context, clienteID int, dia time.Time) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	fin, ok := r.hasta[clienteID]
-	return ok && dia.Format("2006-01-02") <= fin, nil
+	for _, m := range r.mens[clienteID] {
+		if m.EstaVigente(dia) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (r *Repo) Celda(_ context.Context, id int) (*domain.Celda, error) {
@@ -185,4 +206,33 @@ func (r *Repo) RegistrosActivos(_ context.Context) ([]domain.RegistroDetalle, er
 		out = append(out, domain.RegistroDetalle{RegistroID: g.ID, Placa: placa, Cliente: r.clientes[cliente], Celda: r.celdas[g.CeldaID].Codigo, Entrada: g.Entrada})
 	}
 	return out, nil
+}
+
+// GuardarVehiculo aplica las mismas reglas que la base de datos: placa única y cliente único por documento.
+func (r *Repo) GuardarVehiculo(_ context.Context, c *domain.Cliente, v *domain.Vehiculo, m *domain.Mensualidad) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.vehiculos[v.Placa]; ok {
+		return false, domain.ErrPlacaYaRegistrada
+	}
+	nuevo := false
+	id, ok := r.docs[c.Documento]
+	if !ok {
+		r.sigCli++
+		id, nuevo = r.sigCli, true
+		r.docs[c.Documento] = id
+		r.clientes[id], r.documento[id], r.telefono[id] = c.Nombre, c.Documento, c.Telefono
+	}
+	c.ID, c.Nombre = id, r.clientes[id]
+	r.sigVeh++
+	v.ID, v.ClienteID = r.sigVeh, id
+	cp := *v
+	r.vehiculos[v.Placa] = &cp
+	if m != nil {
+		m.ClienteID = id
+		r.sigMens++
+		m.ID = r.sigMens
+		r.mens[id] = append(r.mens[id], *m)
+	}
+	return nuevo, nil
 }

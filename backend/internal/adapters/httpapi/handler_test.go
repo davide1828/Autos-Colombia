@@ -1,19 +1,38 @@
 package httpapi_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"autoscolombia/parqueadero/internal/adapters/httpapi"
 	"autoscolombia/parqueadero/internal/adapters/memory"
+	"autoscolombia/parqueadero/internal/adapters/seguridad"
 	"autoscolombia/parqueadero/internal/application"
 	"autoscolombia/parqueadero/internal/domain"
 )
 
-const token = "token-de-prueba-123456"
+const secreto = "token-de-prueba-123456" // firma las sesiones
+
+// Alias de sesión: llamar() inicia sesión con el usuario correspondiente y usa el token real.
+const (
+	token      = "@encargado"
+	tokenAdmin = "@admin"
+)
+
+const (
+	claveEncargado = "Clave-Encargado-1"
+	claveAdmin     = "Clave-Admin-2026"
+)
+
+var (
+	sesiones   sync.Map // http.Handler -> map de alias -> token
+	hashRapido = seguridad.NuevoPBKDF2(1000)
+)
 
 func nuevoServidor(t *testing.T) http.Handler {
 	t.Helper()
@@ -24,11 +43,40 @@ func nuevoServidor(t *testing.T) http.Handler {
 	r.AgregarVehiculo(domain.Vehiculo{ID: 2, Placa: "DEF456", Tipo: domain.Carro, ClienteID: 2})
 	r.AgregarCelda(domain.Celda{ID: 1, Codigo: "A-01", Tipo: domain.Carro, Estado: domain.CeldaDisponible})
 	r.AgregarCelda(domain.Celda{ID: 2, Codigo: "A-02", Tipo: domain.Carro, Estado: domain.CeldaDisponible})
-	return httpapi.Nueva(application.NuevoServicio(r, nil), token, nil).Rutas()
+	svc := application.NuevoServicio(r, nil).ConHasheador(hashRapido)
+	svc.CrearUsuario(context.Background(), "admin1", "Ana Administradora", claveAdmin, domain.RolAdministrador)
+	svc.CrearUsuario(context.Background(), "encargado1", "Luis Encargado", claveEncargado, domain.RolEncargado)
+	return httpapi.Nueva(svc, secreto, nil).Rutas()
+}
+
+// tokenDe inicia sesión (una vez por servidor y alias) y devuelve el token firmado.
+func tokenDe(t *testing.T, h http.Handler, alias string) string {
+	t.Helper()
+	m, _ := sesiones.LoadOrStore(h, &sync.Map{})
+	cache := m.(*sync.Map)
+	if tok, ok := cache.Load(alias); ok {
+		return tok.(string)
+	}
+	usuario, clave := "encargado1", claveEncargado
+	if alias == tokenAdmin {
+		usuario, clave = "admin1", claveAdmin
+	}
+	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(`{"usuario":"`+usuario+`","clave":"`+clave+`"}`))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var out struct{ Token string }
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Token == "" {
+		t.Fatalf("no se pudo iniciar sesión como %s: %d %s", usuario, rec.Code, rec.Body.String())
+	}
+	cache.Store(alias, out.Token)
+	return out.Token
 }
 
 func llamar(t *testing.T, h http.Handler, metodo, ruta, cuerpo, tok string) (*httptest.ResponseRecorder, map[string]any) {
 	t.Helper()
+	if strings.HasPrefix(tok, "@") {
+		tok = tokenDe(t, h, tok)
+	}
 	req := httptest.NewRequest(metodo, ruta, strings.NewReader(cuerpo))
 	if tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
@@ -55,6 +103,7 @@ func TestAutenticacion(t *testing.T) {
 
 func TestLimiteDeIntentosFallidos(t *testing.T) {
 	h := nuevoServidor(t)
+	valido := tokenDe(t, h, token) // se obtiene antes de que la IP quede bloqueada
 	for i := 0; i < 10; i++ {
 		if rec, _ := llamar(t, h, "GET", "/api/sesion", "", "mala"); rec.Code != 401 {
 			t.Fatalf("intento %d: esperaba 401, obtuve %d", i, rec.Code)
@@ -65,7 +114,7 @@ func TestLimiteDeIntentosFallidos(t *testing.T) {
 		t.Fatalf("esperaba 429 con Retry-After, obtuve %d %v", rec.Code, m)
 	}
 	// Incluso la clave correcta queda bloqueada mientras dure la ventana desde la misma IP.
-	if rec, _ := llamar(t, h, "GET", "/api/sesion", "", token); rec.Code != 429 {
+	if rec, _ := llamar(t, h, "GET", "/api/sesion", "", valido); rec.Code != 429 {
 		t.Fatalf("la IP bloqueada debía recibir 429, obtuve %d", rec.Code)
 	}
 }
@@ -156,5 +205,41 @@ func TestMetodoNoPermitido(t *testing.T) {
 func TestSaludSinAutenticacion(t *testing.T) {
 	if rec, _ := llamar(t, nuevoServidor(t), "GET", "/healthz", "", ""); rec.Code != 200 {
 		t.Fatalf("healthz debía responder 200, obtuvo %d", rec.Code)
+	}
+}
+
+// CP-V06 · RF-08 · POST /api/vehiculos: 201, 400, 401 y 409; el vehículo registrado ingresa de inmediato.
+func TestRegistrarVehiculo_API(t *testing.T) {
+	h := nuevoServidor(t)
+	cuerpo := `{"placa":"jkl-456","tipo":"CARRO","cliente":{"documento":"5005005005","nombre":"Ana Pérez","telefono":"3004445566"},"mensualidad":{"fecha_inicio":"2026-01-01","fecha_fin":"2099-12-31"}}`
+
+	if rec, _ := llamar(t, h, "POST", "/api/vehiculos", cuerpo, ""); rec.Code != 401 {
+		t.Fatalf("sin token esperaba 401, obtuve %d", rec.Code)
+	}
+	rec, m := llamar(t, h, "POST", "/api/vehiculos", cuerpo, token)
+	if rec.Code != 201 || m["placa"] != "JKL456" || m["tipo"] != "CARRO" || m["cliente"] != "Ana Pérez" || m["cliente_nuevo"] != true || m["mensualidad_registrada"] != true || m["id_vehiculo"] == nil {
+		t.Fatalf("registro: %d %v", rec.Code, m)
+	}
+	// Ya registrado: puede ingresar de inmediato.
+	if rec, m := llamar(t, h, "POST", "/api/ingresos", `{"placa":"JKL456","id_celda":1}`, token); rec.Code != 201 {
+		t.Fatalf("ingreso del vehículo recién registrado: %d %v", rec.Code, m)
+	}
+	// Placa repetida → 409.
+	if rec, m := llamar(t, h, "POST", "/api/vehiculos", cuerpo, token); rec.Code != 409 || m["error"] != "conflicto" {
+		t.Fatalf("placa repetida debía dar 409: %d %v", rec.Code, m)
+	}
+	invalidos := map[string]string{
+		"placa inválida":    `{"placa":"AB12","tipo":"CARRO","cliente":{"documento":"1","nombre":"Ana"}}`,
+		"tipo inválido":     `{"placa":"MNO12P","tipo":"BUS","cliente":{"documento":"1","nombre":"Ana"}}`,
+		"sin cliente":       `{"placa":"MNO12P","tipo":"MOTO"}`,
+		"fechas invertidas": `{"placa":"MNO12P","tipo":"MOTO","cliente":{"documento":"1","nombre":"Ana"},"mensualidad":{"fecha_inicio":"2026-10-31","fecha_fin":"2026-10-01"}}`,
+	}
+	for nombre, c := range invalidos {
+		if rec, m := llamar(t, h, "POST", "/api/vehiculos", c, token); rec.Code != 400 || m["error"] != "datos_invalidos" {
+			t.Errorf("%s: esperaba 400, obtuve %d %v", nombre, rec.Code, m)
+		}
+	}
+	if rec, _ := llamar(t, h, "POST", "/api/vehiculos", `{"placa":"MNO12P","tipo":"MOTO","extra":1}`, token); rec.Code != 400 {
+		t.Errorf("campos desconocidos debían dar 400, obtuve %d", rec.Code)
 	}
 }

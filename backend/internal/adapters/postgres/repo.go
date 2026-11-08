@@ -93,6 +93,9 @@ func (r *Repo) GuardarIngreso(ctx context.Context, g *domain.Registro, n *domain
 			}
 			return domain.ErrCeldaNoDisponible
 		}
+		if errors.As(err, &pe) && pe.Code == "23514" && pe.Constraint == "ck_registro_tipos_compatibles" {
+			return domain.ErrCeldaIncompatible // el tipo del vehículo cambió mientras se registraba el ingreso
+		}
 		return err
 	}
 	if n != nil {
@@ -182,4 +185,44 @@ func (r *Repo) RegistrosActivos(ctx context.Context) ([]domain.RegistroDetalle, 
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+// GuardarVehiculo registra cliente (si es nuevo), vehículo y mensualidad en una sola transacción.
+func (r *Repo) GuardarVehiculo(ctx context.Context, c *domain.Cliente, v *domain.Vehiculo, m *domain.Mensualidad) (bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	nuevo := true
+	err = tx.QueryRowContext(ctx,
+		`INSERT INTO cliente (documento, nombre, telefono) VALUES ($1,$2,NULLIF($3,''))
+		 ON CONFLICT (documento) DO NOTHING RETURNING id_cliente`, c.Documento, c.Nombre, c.Telefono).Scan(&c.ID)
+	if errors.Is(err, sql.ErrNoRows) { // el documento ya existe: se reutiliza el cliente
+		nuevo = false
+		err = tx.QueryRowContext(ctx, `SELECT id_cliente, nombre FROM cliente WHERE documento=$1`, c.Documento).Scan(&c.ID, &c.Nombre)
+	}
+	if err != nil {
+		return false, err
+	}
+	v.ClienteID = c.ID
+	err = tx.QueryRowContext(ctx,
+		`INSERT INTO vehiculo (placa, tipo, id_cliente) VALUES ($1,$2,$3) RETURNING id_vehiculo`,
+		v.Placa, string(v.Tipo), c.ID).Scan(&v.ID)
+	var pe *pq.Error
+	if errors.As(err, &pe) && pe.Code == "23505" {
+		return false, domain.ErrPlacaYaRegistrada
+	}
+	if err != nil {
+		return false, err
+	}
+	if m != nil {
+		m.ClienteID = c.ID
+		if err := tx.QueryRowContext(ctx,
+			`INSERT INTO mensualidad (id_cliente, fecha_inicio, fecha_fin) VALUES ($1,$2,$3) RETURNING id_mensualidad`,
+			c.ID, m.Inicio.Format("2006-01-02"), m.Fin.Format("2006-01-02")).Scan(&m.ID); err != nil {
+			return false, err
+		}
+	}
+	return nuevo, tx.Commit()
 }

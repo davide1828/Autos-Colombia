@@ -15,6 +15,7 @@ import (
 
 	"autoscolombia/parqueadero/internal/adapters/httpapi"
 	"autoscolombia/parqueadero/internal/adapters/postgres"
+	"autoscolombia/parqueadero/internal/adapters/seguridad"
 	"autoscolombia/parqueadero/internal/application"
 	"autoscolombia/parqueadero/internal/config"
 )
@@ -51,7 +52,16 @@ func ejecutar(log *slog.Logger) error {
 		return errors.Join(errors.New("no se pudo conectar a la base de datos"), err)
 	}
 
-	svc := application.NuevoServicio(postgres.Nuevo(db), time.Now)
+	repo := postgres.Nuevo(db)
+	if err := repo.EsquemaActualizado(context.Background()); err != nil {
+		return err
+	}
+	svc := application.NuevoServicio(repo, time.Now).ConHasheador(seguridad.NuevoPBKDF2(cfg.HashIteraciones))
+	if cfg.APIToken != "" {
+		if err := prepararAdministrador(log, svc, cfg); err != nil {
+			return err
+		}
+	}
 	api := httpapi.Nueva(svc, cfg.APIToken, log)
 
 	raiz := http.NewServeMux()
@@ -89,6 +99,26 @@ func ejecutar(log *slog.Logger) error {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return srv.Shutdown(shutdownCtx)
+	}
+	return nil
+}
+
+// prepararAdministrador crea el primer administrador con ADMIN_USUARIO / ADMIN_CLAVE cuando la base aún no tiene usuarios.
+func prepararAdministrador(log *slog.Logger, svc *application.Servicio, cfg config.Config) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if cfg.AdminClave == "" {
+		if n, err := svc.Usuarios(ctx); err == nil && len(n) == 0 {
+			log.Warn("no hay usuarios: defina ADMIN_USUARIO y ADMIN_CLAVE para crear el primer administrador")
+		}
+		return nil
+	}
+	creado, err := svc.AsegurarAdministrador(ctx, cfg.AdminUsuario, cfg.AdminNombre, cfg.AdminClave)
+	if err != nil {
+		return errors.Join(errors.New("no se pudo crear el administrador inicial"), err)
+	}
+	if creado {
+		log.Info("administrador inicial creado", "usuario", cfg.AdminUsuario)
 	}
 	return nil
 }

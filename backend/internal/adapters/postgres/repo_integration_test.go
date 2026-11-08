@@ -183,3 +183,92 @@ func TestRestriccionesDeLaBase(t *testing.T) {
 		t.Error("la salida no puede ser anterior a la entrada")
 	}
 }
+
+// ---- RF-08: registrar vehículo contra PostgreSQL real ----
+
+// CP-V10 · RF-08 · PostgreSQL: registro con cliente nuevo y existente; el vehículo registrado ingresa.
+func TestRegistrarVehiculoContraPostgres(t *testing.T) {
+	db := baseDeDatos(t)
+	sembrar(t, db, 0)
+	reloj := time.Date(2026, 10, 20, 15, 0, 0, 0, time.UTC)
+	s := application.NuevoServicio(postgres.Nuevo(db), func() time.Time { return reloj })
+	cli := application.ClienteEntrada{Documento: "5005005005", Nombre: "Ana Pérez", Telefono: "3004445566"}
+	men := &application.MensualidadEntrada{FechaInicio: "2026-10-01", FechaFin: "2026-10-31"}
+
+	res, err := s.RegistrarVehiculo(ctx, "jkl-456", domain.Carro, cli, men)
+	if err != nil || !res.ClienteNuevo || !res.MensualidadRegistrada || res.Vehiculo.ID == 0 || res.Cliente != "Ana Pérez" {
+		t.Fatalf("registro: %v %+v", err, res)
+	}
+	// Segundo vehículo con el mismo documento: reutiliza al cliente (sin duplicarlo) y conserva el nombre.
+	res2, err := s.RegistrarVehiculo(ctx, "MNO12P", domain.Moto, application.ClienteEntrada{Documento: "5005005005", Nombre: "Otro nombre"}, nil)
+	if err != nil || res2.ClienteNuevo || res2.Cliente != "Ana Pérez" || res2.Vehiculo.ClienteID != res.Vehiculo.ClienteID {
+		t.Fatalf("segundo vehículo: %v %+v", err, res2)
+	}
+	var clientes, mensualidades int
+	_ = db.QueryRow(`SELECT count(*) FROM cliente WHERE documento='5005005005'`).Scan(&clientes)
+	_ = db.QueryRow(`SELECT count(*) FROM mensualidad WHERE id_cliente=$1`, res.Vehiculo.ClienteID).Scan(&mensualidades)
+	if clientes != 1 || mensualidades != 1 {
+		t.Fatalf("esperaba 1 cliente y 1 mensualidad, hubo %d y %d", clientes, mensualidades)
+	}
+	// Los vehículos registrados pueden ingresar (la mensualidad quedó guardada).
+	if _, err := s.RegistrarIngreso(ctx, "JKL456", 1, nil); err != nil {
+		t.Fatalf("ingreso del vehículo registrado: %v", err)
+	}
+	if _, err := s.RegistrarIngreso(ctx, "MNO12P", 3, nil); err != nil {
+		t.Fatalf("ingreso de la moto: %v", err)
+	}
+	// Placa repetida.
+	if _, err := s.RegistrarVehiculo(ctx, "JKL456", domain.Carro, cli, nil); !errors.Is(err, domain.ErrPlacaYaRegistrada) {
+		t.Fatalf("placa repetida: %v", err)
+	}
+}
+
+// CP-V11 · RF-08 · PostgreSQL: si falla el vehículo, la transacción deshace también al cliente nuevo.
+func TestRegistrarVehiculo_PlacaRepetidaDeshaceClienteNuevo(t *testing.T) {
+	db := baseDeDatos(t)
+	sembrar(t, db, 0)
+	repo := postgres.Nuevo(db)
+	c := &domain.Cliente{Documento: "7007007007", Nombre: "Nuevo Cliente"}
+	v := &domain.Vehiculo{Placa: "DEF456", Tipo: domain.Carro} // ya existe en la siembra
+	m, _ := domain.NuevaMensualidad("2026-10-01", "2026-10-31")
+	if _, err := repo.GuardarVehiculo(ctx, c, v, m); !errors.Is(err, domain.ErrPlacaYaRegistrada) {
+		t.Fatalf("esperaba ErrPlacaYaRegistrada, obtuve %v", err)
+	}
+	var n int
+	_ = db.QueryRow(`SELECT count(*) FROM cliente WHERE documento='7007007007'`).Scan(&n)
+	if n != 0 {
+		t.Fatal("el cliente nuevo debía deshacerse junto con el vehículo")
+	}
+}
+
+// CP-V12 · RF-08, RNF-11 · PostgreSQL: misma placa desde 12 conexiones a la vez; la restricción UNIQUE deja pasar una.
+func TestRegistrarVehiculo_MismaPlacaSimultanea(t *testing.T) {
+	db := baseDeDatos(t)
+	sembrar(t, db, 0)
+	db.SetMaxOpenConns(12)
+	s := application.NuevoServicio(postgres.Nuevo(db), nil)
+	var ok, dup int32
+	var wg sync.WaitGroup
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			cli := application.ClienteEntrada{Documento: fmt.Sprintf("90%d", i%3), Nombre: "Cliente"} // documentos repetidos entre hilos
+			_, err := s.RegistrarVehiculo(ctx, "JKL456", domain.Carro, cli, nil)
+			switch {
+			case err == nil:
+				atomic.AddInt32(&ok, 1)
+			case errors.Is(err, domain.ErrPlacaYaRegistrada):
+				atomic.AddInt32(&dup, 1)
+			default:
+				t.Errorf("error inesperado: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+	var veh int
+	_ = db.QueryRow(`SELECT count(*) FROM vehiculo WHERE placa='JKL456'`).Scan(&veh)
+	if ok != 1 || dup != 11 || veh != 1 {
+		t.Fatalf("esperaba 1 registro y 11 rechazos, hubo %d, %d (filas: %d)", ok, dup, veh)
+	}
+}

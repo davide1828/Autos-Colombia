@@ -202,3 +202,112 @@ func TestIngresoConcurrente_UnaSolaCelda(t *testing.T) {
 		t.Fatalf("solo un ingreso debía lograrse, hubo %d", exitos.Load())
 	}
 }
+
+// ---- RF-08: registrar vehículo ----
+
+var mensOct = &application.MensualidadEntrada{FechaInicio: "2026-10-01", FechaFin: "2026-10-31"}
+var anaPerez = application.ClienteEntrada{Documento: "5005005005", Nombre: " Ana  Pérez ", Telefono: "3004445566"}
+
+// CP-V01 · RF-08 · Registrar un vehículo con cliente nuevo; luego puede ingresar.
+func TestRegistrarVehiculo_ClienteNuevoYLuegoPuedeIngresar(t *testing.T) {
+	s, _ := nuevoEscenario(t, mediodia)
+	res, err := s.RegistrarVehiculo(ctx, " jkl-456 ", domain.Carro, anaPerez, mensOct)
+	if err != nil {
+		t.Fatalf("esperaba registro exitoso: %v", err)
+	}
+	if res.Vehiculo.Placa != "JKL456" || res.Vehiculo.ID == 0 || res.Vehiculo.ClienteID == 0 || res.Cliente != "Ana Pérez" || !res.ClienteNuevo || !res.MensualidadRegistrada {
+		t.Fatalf("resultado inesperado: %+v", res)
+	}
+	// El vehículo recién registrado ya puede ingresar (RN-01) en una celda libre de su tipo.
+	if _, err := s.RegistrarIngreso(ctx, "JKL456", 1, nil); err != nil {
+		t.Fatalf("el vehículo registrado debía poder ingresar: %v", err)
+	}
+}
+
+// CP-V02 · RF-08 · Sin mensualidad registrada el vehículo no puede ingresar (RN-01).
+func TestRegistrarVehiculo_SinMensualidadNoPuedeIngresar(t *testing.T) {
+	s, _ := nuevoEscenario(t, mediodia)
+	res, err := s.RegistrarVehiculo(ctx, "JKL456", domain.Moto, anaPerez, nil)
+	if err != nil || res.MensualidadRegistrada {
+		t.Fatalf("registro sin mensualidad: %v %+v", err, res)
+	}
+	if _, err := s.RegistrarIngreso(ctx, "JKL456", 3, nil); !errors.Is(err, domain.ErrMensualidadVencida) {
+		t.Fatalf("sin mensualidad el ingreso debía rechazarse: %v", err)
+	}
+}
+
+// CP-V03 · RF-08 · El mismo documento reutiliza al cliente (no se duplica) y comparte su mensualidad.
+func TestRegistrarVehiculo_ReutilizaClientePorDocumento(t *testing.T) {
+	s, _ := nuevoEscenario(t, mediodia)
+	if _, err := s.RegistrarVehiculo(ctx, "JKL456", domain.Carro, anaPerez, mensOct); err != nil {
+		t.Fatal(err)
+	}
+	// Segundo vehículo del mismo cliente (mismo documento): no se duplica y conserva el nombre guardado.
+	otro := application.ClienteEntrada{Documento: "5005005005", Nombre: "Otro nombre"}
+	res, err := s.RegistrarVehiculo(ctx, "MNO12P", domain.Moto, otro, nil)
+	if err != nil || res.ClienteNuevo || res.Cliente != "Ana Pérez" {
+		t.Fatalf("debía reutilizar al cliente existente: %v %+v", err, res)
+	}
+	// Y como la mensualidad es del cliente, la moto también puede ingresar.
+	if _, err := s.RegistrarIngreso(ctx, "MNO12P", 3, nil); err != nil {
+		t.Fatalf("la moto del mismo cliente debía poder ingresar: %v", err)
+	}
+}
+
+// CP-V04 · RF-08 · Placa repetida o inválida, tipo inválido, cliente incompleto y fechas inválidas se rechazan sin dejar datos a medias.
+func TestRegistrarVehiculo_Rechazos(t *testing.T) {
+	s, _ := nuevoEscenario(t, mediodia)
+	casos := []struct {
+		nombre string
+		placa  string
+		tipo   domain.TipoVehiculo
+		cli    application.ClienteEntrada
+		men    *application.MensualidadEntrada
+		quiere error
+	}{
+		{"placa duplicada", "ABC123", domain.Carro, anaPerez, mensOct, domain.ErrPlacaYaRegistrada},
+		{"placa duplicada con otro formato", " abc-123 ", domain.Carro, anaPerez, mensOct, domain.ErrPlacaYaRegistrada},
+		{"placa inválida", "AB12", domain.Carro, anaPerez, mensOct, domain.ErrPlacaInvalida},
+		{"tipo inválido", "JKL456", "BUS", anaPerez, mensOct, domain.ErrTipoVehiculoInvalido},
+		{"tipo vacío", "JKL456", "", anaPerez, mensOct, domain.ErrTipoVehiculoInvalido},
+		{"sin documento", "JKL456", domain.Carro, application.ClienteEntrada{Nombre: "Ana"}, mensOct, domain.ErrClienteInvalido},
+		{"sin nombre", "JKL456", domain.Carro, application.ClienteEntrada{Documento: "1"}, mensOct, domain.ErrClienteInvalido},
+		{"fechas invertidas", "JKL456", domain.Carro, anaPerez, &application.MensualidadEntrada{FechaInicio: "2026-10-31", FechaFin: "2026-10-01"}, domain.ErrMensualidadInvalida},
+		{"fecha mal escrita", "JKL456", domain.Carro, anaPerez, &application.MensualidadEntrada{FechaInicio: "ayer", FechaFin: "2026-10-01"}, domain.ErrMensualidadInvalida},
+	}
+	for _, c := range casos {
+		if _, err := s.RegistrarVehiculo(ctx, c.placa, c.tipo, c.cli, c.men); !errors.Is(err, c.quiere) {
+			t.Errorf("%s: esperaba %v, obtuve %v", c.nombre, c.quiere, err)
+		}
+	}
+	// Ningún rechazo debe haber dejado el vehículo a medias.
+	if _, err := s.RegistrarIngreso(ctx, "JKL456", 1, nil); !errors.Is(err, domain.ErrVehiculoNoRegistrado) {
+		t.Fatalf("tras los rechazos la placa no debía existir: %v", err)
+	}
+}
+
+// CP-V05 · RF-08, RNF-11 · Doce registros simultáneos de la misma placa: solo uno gana.
+func TestRegistrarVehiculo_MismaPlacaSimultanea_SoloUnoGana(t *testing.T) {
+	s, _ := nuevoEscenario(t, mediodia)
+	var ok, dup int32
+	var wg sync.WaitGroup
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := s.RegistrarVehiculo(ctx, "JKL456", domain.Carro, anaPerez, mensOct)
+			switch {
+			case err == nil:
+				atomic.AddInt32(&ok, 1)
+			case errors.Is(err, domain.ErrPlacaYaRegistrada):
+				atomic.AddInt32(&dup, 1)
+			default:
+				t.Errorf("error inesperado: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	if ok != 1 || dup != 11 {
+		t.Fatalf("esperaba 1 registro y 11 rechazos, hubo %d y %d", ok, dup)
+	}
+}

@@ -19,6 +19,10 @@ func TestValidar(t *testing.T) {
 		{"token corto", config.Config{APIToken: "corto", Port: "8080"}, "al menos"},
 		{"puerto inválido", config.Config{APIToken: strings.Repeat("a", 16), Port: "abc"}, "PORT inválido"},
 		{"puerto fuera de rango", config.Config{APIToken: strings.Repeat("a", 16), Port: "70000"}, "PORT inválido"},
+		{"administrador válido", config.Config{APIToken: strings.Repeat("a", 16), Port: "8080", AdminUsuario: "admin", AdminClave: "Clave-Inicial-2026"}, ""},
+		{"clave de administrador débil", config.Config{APIToken: strings.Repeat("a", 16), Port: "8080", AdminUsuario: "admin", AdminClave: "corta1"}, "ADMIN_CLAVE inválida"},
+		{"clave sin números", config.Config{APIToken: strings.Repeat("a", 16), Port: "8080", AdminUsuario: "admin", AdminClave: "SoloLetrasLargas"}, "ADMIN_CLAVE inválida"},
+		{"usuario de administrador inválido", config.Config{APIToken: strings.Repeat("a", 16), Port: "8080", AdminUsuario: "Admin Uno", AdminClave: "Clave-Inicial-2026"}, "ADMIN_USUARIO inválido"},
 	}
 	for _, c := range casos {
 		t.Run(c.nombre, func(t *testing.T) {
@@ -52,5 +56,20 @@ func TestCargar_FallaSinToken(t *testing.T) {
 	t.Setenv("ALLOW_INSECURE_NO_AUTH", "true")
 	if _, err := config.Cargar(); err != nil {
 		t.Fatalf("con ALLOW_INSECURE_NO_AUTH=true debía permitir arrancar: %v", err)
+	}
+}
+
+// CP-G01 · RF-14 · La configuración exige un administrador inicial con clave que cumpla la política.
+func TestCargar_Administrador(t *testing.T) {
+	t.Setenv("API_TOKEN", strings.Repeat("x", 20))
+	t.Setenv("ADMIN_CLAVE", "Clave-Inicial-2026")
+	t.Setenv("HASH_ITERACIONES", "2000")
+	c, err := config.Cargar()
+	if err != nil || c.AdminUsuario != "admin" || c.AdminNombre != "Administrador" || c.AdminClave != "Clave-Inicial-2026" || c.HashIteraciones != 2000 {
+		t.Fatalf("configuración inesperada: %+v %v", c, err)
+	}
+	t.Setenv("HASH_ITERACIONES", "10")
+	if _, err := config.Cargar(); err == nil || !strings.Contains(err.Error(), "HASH_ITERACIONES") {
+		t.Fatalf("un costo menor a 1000 debía rechazarse: %v", err)
 	}
 }

@@ -57,3 +57,61 @@ func TestCeldaPuedeOcuparse(t *testing.T) {
 		}
 	}
 }
+
+// CP-V07 · RF-08 · Cliente: espacios compactados y límites de documento (20), nombre (100) y teléfono (20).
+func TestNormalizarCliente(t *testing.T) {
+	c, err := domain.NormalizarCliente(domain.Cliente{Documento: " 123 ", Nombre: "  Ana   María  Pérez ", Telefono: " 300 "})
+	if err != nil || c.Documento != "123" || c.Nombre != "Ana María Pérez" || c.Telefono != "300" {
+		t.Fatalf("normalización: %+v %v", c, err)
+	}
+	largo := func(n int) string { return stringN("x", n) }
+	invalidos := []domain.Cliente{
+		{Documento: "", Nombre: "Ana"}, {Documento: "1", Nombre: "   "},
+		{Documento: largo(21), Nombre: "Ana"}, {Documento: "1", Nombre: largo(101)}, {Documento: "1", Nombre: "Ana", Telefono: largo(21)},
+	}
+	for i, c := range invalidos {
+		if _, err := domain.NormalizarCliente(c); !errors.Is(err, domain.ErrClienteInvalido) {
+			t.Errorf("caso %d: esperaba ErrClienteInvalido, obtuve %v", i, err)
+		}
+	}
+}
+
+func stringN(s string, n int) string {
+	out := ""
+	for i := 0; i < n; i++ {
+		out += s
+	}
+	return out
+}
+
+// CP-V08 · RF-08 · Solo CARRO y MOTO son tipos de vehículo válidos.
+func TestTipoVehiculoValido(t *testing.T) {
+	if !domain.Carro.Valido() || !domain.Moto.Valido() || domain.TipoVehiculo("BUS").Valido() || domain.TipoVehiculo("").Valido() {
+		t.Fatal("solo CARRO y MOTO son tipos válidos")
+	}
+}
+
+// CP-V09 · RF-08, RF-11 · Mensualidad: periodo inclusivo, un solo día válido y fechas inválidas rechazadas.
+func TestMensualidad(t *testing.T) {
+	m, err := domain.NuevaMensualidad("2026-10-01", "2026-10-31")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for dia, quiere := range map[string]bool{"2026-09-30": false, "2026-10-01": true, "2026-10-31": true, "2026-11-01": false} {
+		d, _ := time.Parse("2006-01-02", dia)
+		if m.EstaVigente(d) != quiere {
+			t.Errorf("EstaVigente(%s) debía ser %v", dia, quiere)
+		}
+	}
+	if _, err := domain.NuevaMensualidad("2026-10-31", "2026-10-01"); !errors.Is(err, domain.ErrMensualidadInvalida) {
+		t.Error("fin anterior al inicio debía fallar")
+	}
+	for _, par := range [][2]string{{"", "2026-10-01"}, {"2026-13-01", "2026-12-01"}, {"01/10/2026", "31/10/2026"}} {
+		if _, err := domain.NuevaMensualidad(par[0], par[1]); !errors.Is(err, domain.ErrMensualidadInvalida) {
+			t.Errorf("fechas %v debían fallar", par)
+		}
+	}
+	if m1, err := domain.NuevaMensualidad("2026-10-05", "2026-10-05"); err != nil || !m1.EstaVigente(m1.Inicio) {
+		t.Error("una mensualidad de un solo día es válida")
+	}
+}
