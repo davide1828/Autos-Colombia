@@ -1,59 +1,180 @@
-# Parqueadero "Autos Colombia" — Iteración 1: entrada y salida de vehículos
+# Autos Colombia - Parqueadero
 
-Aplicación web responsive (PWA) para celulares, tablets y computadores.
+Aplicación web para gestionar el ingreso, salida y control de vehículos en un parqueadero, con soporte para usuarios administrativos y flujo de operación desde dispositivos móviles y escritorio.
 
-- **Backend:** Go (arquitectura hexagonal: `domain`, `application`, `adapters/httpapi`, `adapters/postgres`)
-- **Frontend:** React + Vite
-- **Base de datos:** PostgreSQL 16 (`backend/db/schema.sql`, `backend/db/seed.sql`)
-- **Documentación y diagramas:** `docs/` (fuentes PlantUML + PNG; el PDF de la EA1 no usa StarUML)
+## ¿Qué hace el sistema?
 
-## Ejecutar
+La plataforma permite:
+
+- registrar ingresos de vehículos con selección de celda
+- registrar salidas y cálculo del tiempo transcurrido
+- controlar celdas disponibles y ocupadas
+- manejar novedades asociadas a un vehículo
+- validar usuarios mensuales y condiciones de acceso
+- mantener una auditoría de movimientos y administración del patio
+- ofrecer una interfaz responsive y de fácil uso en celular y escritorio
+
+## Stack tecnológico
+
+- Frontend: React + Vite
+- Backend: Go
+- Base de datos: PostgreSQL 16
+- Arquitectura: enfoque hexagonal / capas (`domain`, `application`, `adapters`, `config`)
+- Seguridad: token de API, hash PBKDF2, validación de credenciales, límites de intentos y headers de seguridad
+
+## Estructura del proyecto
+
+```text
+.
+├── backend/
+│   ├── cmd/api/                 # punto de entrada de la API
+│   ├── db/                      # esquema y datos semilla de PostgreSQL
+│   ├── internal/
+│   │   ├── adapters/            # HTTP, Postgres, seguridad, memoria
+│   │   ├── application/        # casos de uso y servicios
+│   │   ├── config/             # carga de variables de entorno
+│   │   └── domain/             # entidades y reglas de negocio
+│   └── static/                 # assets del frontend compilados
+├── frontend/
+│   ├── src/                    # código del cliente React
+│   ├── package.json            # scripts y dependencias del frontend
+│   └── vite.config.js         # configuración de Vite
+├── docs/
+│   ├── diagramas/              # diagramas PlantUML y modelos
+│   └── pantallas/             # mockups y recursos visuales
+├── docker-compose.yml
+├── Dockerfile
+├── Makefile
+├── README.md
+└── iniciar.bat / iniciar.ps1
+```
+
+## Requisitos
+
+- Docker y Docker Compose
+- Go 1.22+
+- Node.js 18+ y npm
+- Puerto 8080 disponible para la app
+
+## Inicio rápido
+
+### 1) Levantar la base de datos
 
 ```bash
-# 1. Base de datos (Docker)
 docker compose up -d db
-
-# 2. Compilar el frontend dentro del backend
-make build            # o: cd frontend && npm ci && npm run build && cp -r dist ../backend/static
-
-# 3. API + frontend en http://localhost:8080  (API_TOKEN: mínimo 16 caracteres)
-cd backend && API_TOKEN=una-clave-larga-123 go run ./cmd/api
 ```
 
-Todo en contenedores: `API_TOKEN=una-clave-larga-123 docker compose --profile app up --build`.
+Esto crea la base PostgreSQL con el esquema inicial y los datos semilla.
 
-Variables: `API_TOKEN` (obligatoria), `DATABASE_URL`, `PORT` (8080), `STATIC_DIR` (./static).
-La API **no arranca sin `API_TOKEN`** (solo con `ALLOW_INSECURE_NO_AUTH=true`, para desarrollo local).
-Al abrir la app, escriba esa clave en la pantalla de acceso.
-
-## Calidad
+### 2) Compilar el frontend y dejarlo disponible para la API
 
 ```bash
-make lint      # gofmt, go vet, eslint
-make test      # backend con -race + frontend (vitest)
-make test-integration   # incluye PostgreSQL real (use una base DESECHABLE)
+make build
 ```
 
-- Backend: arquitectura hexagonal; pruebas de dominio, casos de uso, API HTTP, configuración y PostgreSQL (incluye carrera de concurrencia y restricciones de la base).
-- Seguridad: clave obligatoria y comparada en tiempo constante, límite de intentos fallidos, cabeceras de seguridad (CSP, X-Frame-Options…), tiempos de espera del servidor, cierre ordenado, consultas parametrizadas.
-- Zona horaria: la vigencia de la mensualidad se evalúa con el día calendario de Colombia (UTC-5).
-- Frontend: React sin librerías de UI; accesible (etiquetas, foco visible, `aria-live`, no depende solo del color), responsive de 320 px a escritorio.
+Equivalente a:
 
-## API
+```bash
+cd frontend
+npm ci
+npm run build
+cp -r dist ../backend/static
+```
+
+### 3) Ejecutar la API
+
+```bash
+cd backend
+API_TOKEN=una-clave-larga-123 go run ./cmd/api
+```
+
+La aplicación queda disponible en:
+
+- http://localhost:8080
+
+> La variable `API_TOKEN` es obligatoria. Debe tener al menos 16 caracteres. En desarrollo local también puede usarse `ALLOW_INSECURE_NO_AUTH=true`, pero solo como excepción y no como configuración de producción.
+
+## Variables de entorno
+
+La API utiliza estas variables:
+
+- `API_TOKEN`: secreto requerido para autenticar solicitudes HTTP
+- `DATABASE_URL`: URL de conexión a PostgreSQL
+- `PORT`: puerto HTTP principal (por defecto `8080`)
+- `STATIC_DIR`: carpeta donde están los assets estáticos (por defecto `./static`)
+- `ALLOW_INSECURE_NO_AUTH`: habilita modo local inseguro para pruebas rápidas
+- `ADMIN_USUARIO`, `ADMIN_NOMBRE`, `ADMIN_CLAVE`: crean un administrador inicial si existe un usuario vacío
+- `HASH_ITERACIONES`: costo de PBKDF2 para hash de contraseñas
+
+## Ejecutar con Docker Compose
+
+```bash
+API_TOKEN=una-clave-larga-123 docker compose --profile app up --build
+```
+
+Esto levanta la base de datos y la aplicación en un único flujo con la configuración del proyecto.
+
+## Comandos útiles
+
+```bash
+make db
+make build
+make lint
+make test
+make test-integration
+```
+
+Descripción:
+
+- `make lint`: valida formato Go y lint del frontend
+- `make test`: ejecuta pruebas del backend con `-race` y pruebas del frontend
+- `make test-integration`: ejecuta validaciones contra PostgreSQL real
+
+## API principal
+
+Todas las rutas protegidas requieren el encabezado:
+
+```http
+Authorization: Bearer <API_TOKEN>
+```
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/api/ingresos` | Registra el ingreso `{placa, id_celda, novedad?}` |
-| POST | `/api/salidas` | Registra la salida `{placa, novedad?}` |
-| POST | `/api/novedades` | Registra una novedad `{placa, tipo, descripcion}` |
-| GET | `/api/celdas?estado=DISPONIBLE` | Consulta celdas |
-| GET | `/api/registros/activos` | Vehículos dentro |
-| GET | `/api/sesion` | Valida la clave de acceso |
+| POST | `/api/ingresos` | Registra un ingreso con placa, celda y opcional novedad |
+| POST | `/api/salidas` | Registra la salida de un vehículo |
+| POST | `/api/novedades` | Guarda una novedad asociada a una placa |
+| GET | `/api/celdas?estado=DISPONIBLE` | Consulta celdas por estado |
+| GET | `/api/registros/activos` | Muestra los vehículos presentes |
+| GET | `/api/sesion` | Valida la sesión o clave de acceso |
 
-Todas exigen `Authorization: Bearer <API_TOKEN>`.
+## Calidad y seguridad
 
-## Mockups
+El proyecto incluye criterios relevantes de calidad:
 
-Archivo de Figma: https://www.figma.com/design/DhCeukFFGQef4egiIl3UbY/
+- arquitectura en capas con separación de responsabilidades
+- pruebas de dominio, aplicación, HTTP y PostgreSQL
+- validación de concurrencia y restricciones de base de datos
+- seguridad con comparación constante de secretos
+- headers de seguridad para prevención de abuso de la interfaz
+- manejo ordenado de cierre del servidor
+- zona horaria de Colombia UTC-5 para cálculos de vigencia de mensualidad
+- frontend accesible y responsive
 
-Está actualizado al diseño final de la interfaz (25 de octubre de 2026): componentes reutilizables (placa colombiana, selector de celda, bahía del patio, navegación inferior, mensajes, chips y botón), paleta como variables de color (asfalto, papel, placa, libre, ocupada), tipografía Barlow / Barlow Condensed, ocho pantallas para celular (acceso, ingreso diligenciado, ingreso exitoso, rechazo por mensualidad, salida, salida exitosa, novedad y patio), la vista de computador y un prototipo navegable (inicia en la pantalla de acceso).
+## Documentación y diagramas
+
+La carpeta `docs/` contiene los artefactos del proyecto:
+
+- diagramas UML de arquitectura y flujo
+- modelado relacional y físico
+- casos de uso y secuencias
+- mockups de pantallas y prototipos de UI
+
+## Estado del proyecto
+
+Este repositorio corresponde a una iteración funcional del sistema de parqueadero con foco en operación de ingreso/salida, administración, validación de negocio y experiencia de usuario móvil.
+
+Si quieres, puedo dejarte una segunda versión del README orientada a:
+
+1. presentación más comercial y profesional,
+2. documentación técnica más detallada para desarrolladores,
+3. versión enfocada en entrega académica con objetivos, arquitectura y evidencia de pruebas.
