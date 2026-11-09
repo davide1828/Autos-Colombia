@@ -1,0 +1,62 @@
+@startuml secuencia_autenticacion
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam roundCorner 8
+
+title Diagrama de Secuencia - Autenticación y Control de Acceso (Iteración 2)
+
+actor "Operador\n(Admin / Encargado)" as Op #E8F1F8
+box "Frontend PWA" #F8FAFC
+  participant "Pantalla Login\n(React)" as UI #FFFFFF
+end box
+
+box "Backend Go (Seguridad)" #F8FAFC
+  participant "RateLimiter\n(Anti Fuerza Bruta)" as Lim #FFFFFF
+  participant "HTTP Handler\n(POST /api/login)" as API #FFFFFF
+  participant "Servicio Aplicación\n(ServicioGestion)" as App #FFFFFF
+  participant "Hasheador PBKDF2\n(HMAC-SHA256)" as Sec #FFFFFF
+  participant "Emisor Sesión\n(Firma Token)" as Tok #FFFFFF
+end box
+
+database "PostgreSQL 16" as DB #E8F1F8
+
+Op -> UI : Digita usuario y contraseña
+UI -> Lim : POST /api/login {usuario, clave}
+activate Lim
+
+alt IP con más de 5 fallos en 60s
+  Lim --> UI : HTTP 429 Too Many Requests (Retry-After: 60)
+else IP permitida
+  Lim -> API : Procesa solicitud
+  activate API
+  
+  API -> App : Autenticar(ctx, usuario, clave)
+  activate App
+  
+  App -> DB : UsuarioPorLogin(ctx, usuario)
+  activate DB
+  DB --> App : Datos de usuario (hash, salt, rol, activo)
+  deactivate DB
+  
+  App -> Sec : Verificar(hash, clave)
+  activate Sec
+  note over Sec: Comparación en tiempo constante\n(subtle.ConstantTimeCompare)
+  Sec --> App : Contraseña válida (true)
+  deactivate Sec
+  
+  App --> API : Usuario autenticado
+  deactivate App
+  
+  API -> Tok : Emitir(Actor{ID, usuario, rol})
+  activate Tok
+  Tok --> API : Token Bearer firmado + Expiración
+  deactivate Tok
+  
+  API --> UI : HTTP 200 OK {token, expira, usuario}
+  deactivate API
+  
+  UI --> Op : Redirecciona según rol (Admin / Encargado)
+end
+deactivate Lim
+@enduml

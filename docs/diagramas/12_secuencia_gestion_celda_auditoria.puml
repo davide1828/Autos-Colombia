@@ -1,0 +1,70 @@
+@startuml secuencia_gestion_celda
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam roundCorner 8
+
+title Diagrama de Secuencia - Inhabilitación de Celda con Auditoría (Iteración 2)
+
+actor "Administrador" as Admin #E8F1F8
+box "Backend Go (Arquitectura Hexagonal)" #F8FAFC
+  participant "Middleware Auth\n(Bearer JWT)" as Auth #FFFFFF
+  participant "HTTP Handler\n(PUT /api/celdas/{id}/estado)" as API #FFFFFF
+  participant "Servicio Aplicación\n(ServicioGestion)" as App #FFFFFF
+  participant "Dominio\n(Validaciones)" as Dom #FFFFFF
+  participant "Repositorio\n(PostgreSQL)" as Repo #FFFFFF
+end box
+
+database "PostgreSQL 16" as DB #E8F1F8
+
+Admin -> Auth : PUT /api/celdas/3/estado {estado: "INACTIVA"}\nAuthorization: Bearer <token>
+activate Auth
+
+Auth -> DB : Validar usuario activo y rol ADMINISTRADOR
+activate DB
+DB --> Auth : Actor válido (ID: 1, Rol: ADMINISTRADOR)
+deactivate DB
+
+Auth -> API : Continúa petición autenticada
+activate API
+
+API -> App : CambiarEstadoCelda(ctx, 3, "INACTIVA")
+activate App
+
+App -> Dom : EstadoGestionable("INACTIVA")
+activate Dom
+Dom --> App : Válido (DISPONIBLE o INACTIVA)
+deactivate Dom
+
+App -> Repo : CambiarEstadoCelda(ctx, 3, "INACTIVA")
+activate Repo
+
+Repo -> DB : SELECT id_registro FROM registro WHERE id_celda = 3 AND fecha_salida IS NULL
+activate DB
+
+alt Celda tiene vehículo dentro (OCUPADA)
+  DB --> Repo : Registro activo existe
+  Repo --> App : ErrCeldaOcupada (RN-09)
+  App --> API : Error: Celda ocupada
+  API --> Admin : HTTP 409 Conflict ("la celda está ocupada")
+else Celda desocupada
+  DB --> Repo : Sin registro activo
+  Repo -> DB : UPDATE celda SET estado = 'INACTIVA' WHERE id_celda = 3
+  
+  Repo -> DB : INSERT INTO auditoria (momento, id_usuario, usuario, accion, entidad, detalle)
+  note right of DB: Trigger trg_auditoria_inmutable asegura\nque el registro no se podrá alterar (RN-11)
+  
+  DB --> Repo : Transacción confirmada
+  deactivate DB
+  
+  Repo --> App : Éxito
+  deactivate Repo
+  
+  App --> API : Celda actualizada
+  deactivate App
+  
+  API --> Admin : HTTP 200 OK {id_celda: 3, estado: "INACTIVA"}
+  deactivate API
+end
+deactivate Auth
+@enduml

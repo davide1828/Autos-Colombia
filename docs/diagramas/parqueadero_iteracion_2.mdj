@@ -1,0 +1,627 @@
+{
+  "_type": "Project",
+  "_id": "AAAAAa44c05f7779a488cb24",
+  "name": "Parqueadero Autos Colombia",
+  "ownedElements": [
+    {
+      "_type": "UMLModel",
+      "_id": "AAAAA86c28c004a7f46f6b25",
+      "_parent": {
+        "$ref": "AAAAAa44c05f7779a488cb24"
+      },
+      "name": "Iteración 2 - Gestión de Usuarios y Celdas",
+      "ownedElements": [
+        {
+          "_type": "UMLActor",
+          "_id": "AAAAAd389eacb51ca4d6d979",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Administrador"
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "AAAAA40078099ef92495fbb9",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Encargado"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA02821260f82c409f90d",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "CU-06 Iniciar sesión"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA5040717031c0429cb18",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "CU-07 Cambiar propia contraseña"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAAdae07f255e864bf0b33",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "CU-08 Administrar usuarios del sistema"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA39e4219d305c4309805",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "CU-09 Administrar celdas"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA8a4feec87e274526aa7",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "CU-10 Administrar clientes y mensualidades"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAAe6753260d3a0478bb8c",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "CU-11 Consultar bitácora de auditoría"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA41127c6a222f40fea94",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Validar credenciales y tasa de intentos"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAAdedce7064e3144868f1",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Validar política de robustez de contraseña"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA19b2db90050d4aa59e5",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Garantizar al menos un administrador activo"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA935b9eecb647425a916",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Validar que la celda no esté ocupada"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA80ce2fd98d814e019c0",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Validar no solapamiento de fechas de mensualidad"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAA7f535f2412a246f29c1",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Validar tipo vehículo (fuera del parqueadero)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "AAAAAd4ad2f2f4b8b40228f0",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Registrar evento de auditoría inmutable"
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAac9403e89adc4319821",
+          "_parent": {
+            "$ref": "AAAAA40078099ef92495fbb9"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAe539fb72f3a242b4b64",
+            "_parent": {
+              "$ref": "AAAAAac9403e89adc4319821"
+            },
+            "reference": {
+              "$ref": "AAAAA40078099ef92495fbb9"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA12cb7625e3794e01bb5",
+            "_parent": {
+              "$ref": "AAAAAac9403e89adc4319821"
+            },
+            "reference": {
+              "$ref": "AAAAA02821260f82c409f90d"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAdeb0160731b14607bea",
+          "_parent": {
+            "$ref": "AAAAA40078099ef92495fbb9"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA0d7efb760a2d4317a1a",
+            "_parent": {
+              "$ref": "AAAAAdeb0160731b14607bea"
+            },
+            "reference": {
+              "$ref": "AAAAA40078099ef92495fbb9"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA660eef6f637c44e4b58",
+            "_parent": {
+              "$ref": "AAAAAdeb0160731b14607bea"
+            },
+            "reference": {
+              "$ref": "AAAAA5040717031c0429cb18"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAf63c130414504057bec",
+          "_parent": {
+            "$ref": "AAAAA40078099ef92495fbb9"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAd3fca96974af4e429c8",
+            "_parent": {
+              "$ref": "AAAAAf63c130414504057bec"
+            },
+            "reference": {
+              "$ref": "AAAAA40078099ef92495fbb9"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAb9b5bfdeae7344868ff",
+            "_parent": {
+              "$ref": "AAAAAf63c130414504057bec"
+            },
+            "reference": {
+              "$ref": "AAAAA8a4feec87e274526aa7"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAA21e6a9a5445d4d63b4d",
+          "_parent": {
+            "$ref": "AAAAAd389eacb51ca4d6d979"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAf2eade0b9e2b4821bd6",
+            "_parent": {
+              "$ref": "AAAAA21e6a9a5445d4d63b4d"
+            },
+            "reference": {
+              "$ref": "AAAAAd389eacb51ca4d6d979"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA956b858e3b954489873",
+            "_parent": {
+              "$ref": "AAAAA21e6a9a5445d4d63b4d"
+            },
+            "reference": {
+              "$ref": "AAAAA02821260f82c409f90d"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAe0030b2f361c41d09d7",
+          "_parent": {
+            "$ref": "AAAAAd389eacb51ca4d6d979"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA6f91b8b7f62542b4885",
+            "_parent": {
+              "$ref": "AAAAAe0030b2f361c41d09d7"
+            },
+            "reference": {
+              "$ref": "AAAAAd389eacb51ca4d6d979"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAea7a3658fc5641e8952",
+            "_parent": {
+              "$ref": "AAAAAe0030b2f361c41d09d7"
+            },
+            "reference": {
+              "$ref": "AAAAA5040717031c0429cb18"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAd859be40cc1f4409936",
+          "_parent": {
+            "$ref": "AAAAAd389eacb51ca4d6d979"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAa758ad6933664ac499e",
+            "_parent": {
+              "$ref": "AAAAAd859be40cc1f4409936"
+            },
+            "reference": {
+              "$ref": "AAAAAd389eacb51ca4d6d979"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA049c32363c114b59983",
+            "_parent": {
+              "$ref": "AAAAAd859be40cc1f4409936"
+            },
+            "reference": {
+              "$ref": "AAAAAdae07f255e864bf0b33"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAa8077f6963864ee0891",
+          "_parent": {
+            "$ref": "AAAAAd389eacb51ca4d6d979"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAb54e961d51bd4b76b8d",
+            "_parent": {
+              "$ref": "AAAAAa8077f6963864ee0891"
+            },
+            "reference": {
+              "$ref": "AAAAAd389eacb51ca4d6d979"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA30adb1bc7c51435e932",
+            "_parent": {
+              "$ref": "AAAAAa8077f6963864ee0891"
+            },
+            "reference": {
+              "$ref": "AAAAA39e4219d305c4309805"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAAce711fbfd72349b4912",
+          "_parent": {
+            "$ref": "AAAAAd389eacb51ca4d6d979"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAbebbf920309e4e2ebfc",
+            "_parent": {
+              "$ref": "AAAAAce711fbfd72349b4912"
+            },
+            "reference": {
+              "$ref": "AAAAAd389eacb51ca4d6d979"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA904e1f4b2a794fdcb03",
+            "_parent": {
+              "$ref": "AAAAAce711fbfd72349b4912"
+            },
+            "reference": {
+              "$ref": "AAAAA8a4feec87e274526aa7"
+            }
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "AAAAA3ca1e6d08c7c49a2beb",
+          "_parent": {
+            "$ref": "AAAAAd389eacb51ca4d6d979"
+          },
+          "name": "",
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAA89521964b5d247a48d9",
+            "_parent": {
+              "$ref": "AAAAA3ca1e6d08c7c49a2beb"
+            },
+            "reference": {
+              "$ref": "AAAAAd389eacb51ca4d6d979"
+            }
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "AAAAAa4382c17448941369d5",
+            "_parent": {
+              "$ref": "AAAAA3ca1e6d08c7c49a2beb"
+            },
+            "reference": {
+              "$ref": "AAAAAe6753260d3a0478bb8c"
+            }
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA262fdc30ef47463d9bb",
+          "_parent": {
+            "$ref": "AAAAA02821260f82c409f90d"
+          },
+          "source": {
+            "$ref": "AAAAA02821260f82c409f90d"
+          },
+          "target": {
+            "$ref": "AAAAA41127c6a222f40fea94"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA0881dcc69cfe43c5b41",
+          "_parent": {
+            "$ref": "AAAAA5040717031c0429cb18"
+          },
+          "source": {
+            "$ref": "AAAAA5040717031c0429cb18"
+          },
+          "target": {
+            "$ref": "AAAAAdedce7064e3144868f1"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA191737ddf40e4b26a35",
+          "_parent": {
+            "$ref": "AAAAAdae07f255e864bf0b33"
+          },
+          "source": {
+            "$ref": "AAAAAdae07f255e864bf0b33"
+          },
+          "target": {
+            "$ref": "AAAAAdedce7064e3144868f1"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA3aac93ed980e41bd9b2",
+          "_parent": {
+            "$ref": "AAAAAdae07f255e864bf0b33"
+          },
+          "source": {
+            "$ref": "AAAAAdae07f255e864bf0b33"
+          },
+          "target": {
+            "$ref": "AAAAA19b2db90050d4aa59e5"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAAcd18b5086a0d4b35948",
+          "_parent": {
+            "$ref": "AAAAAdae07f255e864bf0b33"
+          },
+          "source": {
+            "$ref": "AAAAAdae07f255e864bf0b33"
+          },
+          "target": {
+            "$ref": "AAAAAd4ad2f2f4b8b40228f0"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA9985aa9325204610ad8",
+          "_parent": {
+            "$ref": "AAAAA39e4219d305c4309805"
+          },
+          "source": {
+            "$ref": "AAAAA39e4219d305c4309805"
+          },
+          "target": {
+            "$ref": "AAAAA935b9eecb647425a916"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA8c18c67886cf4968879",
+          "_parent": {
+            "$ref": "AAAAA39e4219d305c4309805"
+          },
+          "source": {
+            "$ref": "AAAAA39e4219d305c4309805"
+          },
+          "target": {
+            "$ref": "AAAAAd4ad2f2f4b8b40228f0"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAAa97f2d61613c4a44ad1",
+          "_parent": {
+            "$ref": "AAAAA8a4feec87e274526aa7"
+          },
+          "source": {
+            "$ref": "AAAAA8a4feec87e274526aa7"
+          },
+          "target": {
+            "$ref": "AAAAA80ce2fd98d814e019c0"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA2bfdcb0667174547ae7",
+          "_parent": {
+            "$ref": "AAAAA8a4feec87e274526aa7"
+          },
+          "source": {
+            "$ref": "AAAAA8a4feec87e274526aa7"
+          },
+          "target": {
+            "$ref": "AAAAA7f535f2412a246f29c1"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "AAAAA61c32cd714774253bec",
+          "_parent": {
+            "$ref": "AAAAA8a4feec87e274526aa7"
+          },
+          "source": {
+            "$ref": "AAAAA8a4feec87e274526aa7"
+          },
+          "target": {
+            "$ref": "AAAAAd4ad2f2f4b8b40228f0"
+          }
+        },
+        {
+          "_type": "UMLUseCaseDiagram",
+          "_id": "AAAAA101089c2079240dd9c0",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Diagrama de Casos de Uso - Gestión de Usuarios y Celdas"
+        },
+        {
+          "_type": "UMLCollaboration",
+          "_id": "AAAAA89ee38df611947f59d2",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Colaboraciones de Secuencia",
+          "ownedElements": [
+            {
+              "_type": "UMLInteraction",
+              "_id": "AAAAA21db4570b4204c20a81",
+              "_parent": {
+                "$ref": "AAAAA89ee38df611947f59d2"
+              },
+              "name": "Secuencia 01: Registro de Ingreso (Iteración 1)"
+            },
+            {
+              "_type": "UMLInteraction",
+              "_id": "AAAAAb14278a33ca7438f919",
+              "_parent": {
+                "$ref": "AAAAA89ee38df611947f59d2"
+              },
+              "name": "Secuencia 02: Registro de Salida (Iteración 1)"
+            },
+            {
+              "_type": "UMLInteraction",
+              "_id": "AAAAAe73b829916c640139b0",
+              "_parent": {
+                "$ref": "AAAAA89ee38df611947f59d2"
+              },
+              "name": "Secuencia 03: Autenticación y Sesión (Iteración 2)"
+            },
+            {
+              "_type": "UMLInteraction",
+              "_id": "AAAAA993d43ef438b473eba4",
+              "_parent": {
+                "$ref": "AAAAA89ee38df611947f59d2"
+              },
+              "name": "Secuencia 04: Gestión de Celda y Auditoría (Iteración 2)"
+            }
+          ]
+        },
+        {
+          "_type": "UMLModel",
+          "_id": "AAAAA0b52f36ad79d4911ba3",
+          "_parent": {
+            "$ref": "AAAAA86c28c004a7f46f6b25"
+          },
+          "name": "Modelo de Componentes del Sistema",
+          "ownedElements": [
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA78234ae5a7b14ad7831",
+              "name": "Frontend PWA (React + Vite)"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA6a356d3b06cc4dfba9a",
+              "name": "HTTP Router & Middleware"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAAae99f6619e2841e5817",
+              "name": "Controladores API (EA1 & EA2)"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA35efff036e4048a6af5",
+              "name": "Servicio de Aplicación (Operaciones & Gestión)"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA5544aa3dae0b4028ba0",
+              "name": "Dominio (Reglas de Negocio)"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA9ea03a19808d406fa65",
+              "name": "Seguridad PBKDF2 & Token"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA2f395fa7a1194519958",
+              "name": "Adaptador Persistencia (PostgreSQL & Memoria)"
+            },
+            {
+              "_type": "UMLComponent",
+              "_id": "AAAAA0c1d0f924f884bb894a",
+              "name": "Base de Datos PostgreSQL 16 & Triggers"
+            },
+            {
+              "_type": "UMLComponentDiagram",
+              "_id": "AAAAAa6358ed32ed943398a7",
+              "_parent": {
+                "$ref": "AAAAA0b52f36ad79d4911ba3"
+              },
+              "name": "Diagrama de Componentes - Autos Colombia (Iteraciones 1 y 2)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

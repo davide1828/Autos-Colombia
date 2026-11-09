@@ -1,0 +1,66 @@
+@startuml casos_uso_iteracion_2
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam usecaseBackgroundColor #E8F1F8
+skinparam usecaseBorderColor #0f4c81
+skinparam actorBorderColor #0f4c81
+left to right direction
+
+title Casos de uso - Iteración 2: Gestión de usuarios y gestión de celdas
+
+actor "Administrador" as Admin
+actor "Encargado" as Enc
+
+rectangle "Sistema de parqueadero Autos Colombia (Gestión)" {
+  ' Seguridad y sesión
+  usecase "CU-06 Iniciar sesión" as CU06
+  usecase "CU-07 Cambiar propia\ncontraseña" as CU07
+  usecase "Validar credenciales\ny tasa de intentos" as VCred
+  usecase "Validar política\nde contraseña" as VClave
+
+  ' Gestión de usuarios
+  usecase "CU-08 Administrar usuarios\ndel sistema" as CU08
+  usecase "Garantizar al menos un\nadministrador activo" as VAdmin
+
+  ' Gestión de celdas
+  usecase "CU-09 Administrar celdas\ndel parqueadero" as CU09
+  usecase "Validar celda no ocupada\n(inactivación/edición)" as VCelOcup
+
+  ' Gestión de clientes y mensualidades
+  usecase "CU-10 Administrar clientes\ny mensualidades" as CU10
+  usecase "Validar no solapamiento\nde mensualidades" as VMens
+  usecase "Validar tipo vehículo\n(fuera de patio)" as VVeh
+
+  ' Auditoría
+  usecase "CU-11 Consultar bitácora\nde auditoría" as CU11
+  usecase "Registrar evento de\nauditoría inmutable" as RegAud
+}
+
+' Asociaciones de actores
+Enc --> CU06
+Enc --> CU07
+Enc --> CU10
+
+Admin --> CU06
+Admin --> CU07
+Admin --> CU08
+Admin --> CU09
+Admin --> CU10
+Admin --> CU11
+
+' Inclusiones
+CU06 ..> VCred : <<include>>
+CU07 ..> VClave : <<include>>
+
+CU08 ..> VClave : <<include>>
+CU08 ..> VAdmin : <<include>>
+CU08 ..> RegAud : <<include>>
+
+CU09 ..> VCelOcup : <<include>>
+CU09 ..> RegAud : <<include>>
+
+CU10 ..> VMens : <<include>>
+CU10 ..> VVeh : <<include>>
+CU10 ..> RegAud : <<include>>
+@enduml
+

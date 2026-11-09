@@ -1,0 +1,93 @@
+@startuml diagrama_componentes
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle uml2
+skinparam packageBackgroundColor #F8FAFC
+skinparam packageBorderColor #64748B
+skinparam componentBackgroundColor #FFFFFF
+skinparam componentBorderColor #0F4C81
+skinparam interfaceBorderColor #0F4C81
+
+title Diagrama de Componentes — Sistema de Información Autos Colombia (Iteraciones 1 y 2)
+
+package "Frontend (Cliente PWA - React 18 + Vite)" {
+  [Interfaz de Usuario (Vistas & Componentes)] as UI
+  [Cliente API HTTP (Fetch & Auth)] as APIClient
+  UI ..> APIClient : consume
+}
+
+cloud "Protocolo HTTP / HTTPS (JSON)" as HTTP
+
+APIClient -- HTTP
+
+package "Backend Go (Arquitectura Hexagonal)" {
+  
+  package "Capa de Adaptadores Primarios (Transporte HTTP)" {
+    [HTTP Router & Middleware] as Router
+    [Controladores Operativos (EA1)] as CtrlEA1
+    [Controladores Gestión & Auth (EA2)] as CtrlEA2
+    
+    HTTP -- Router
+    Router --> CtrlEA1
+    Router --> CtrlEA2
+  }
+
+  package "Capa de Aplicación (Casos de Uso)" {
+    interface "ServicioOperaciones" as ISvcOp
+    interface "ServicioGestion" as ISvcGes
+    
+    [Servicio Ingreso y Salida] as SvcEA1
+    [Servicio Gestión y Usuarios] as SvcEA2
+    
+    ISvcOp - SvcEA1
+    ISvcGes - SvcEA2
+    
+    CtrlEA1 ..> ISvcOp : invoca
+    CtrlEA2 ..> ISvcGes : invoca
+  }
+
+  package "Capa de Dominio (Reglas de Negocio)" {
+    [Entidades y Validaciones de Negocio] as Dominio
+    SvcEA1 ..> Dominio : valida RN-01 a RN-06
+    SvcEA2 ..> Dominio : valida RN-07 a RN-11
+  }
+
+  package "Capa de Seguridad & Criptografía" {
+    interface "Hasheador" as IHash
+    [Módulo PBKDF2 (HMAC-SHA256)] as SecPBKDF2
+    [Firmador de Tokens de Sesión] as SecToken
+    
+    IHash - SecPBKDF2
+    SvcEA2 ..> IHash : hash / verificación
+    CtrlEA2 ..> SecToken : emite / valida
+  }
+
+  package "Capa de Adaptadores Secundarios (Persistencia)" {
+    interface "RepositorioOperaciones" as IRepoOp
+    interface "RepositorioGestion" as IRepoGes
+    
+    [Adaptador PostgreSQL] as RepoPG
+    [Adaptador Memoria (Testing)] as RepoMem
+    
+    IRepoOp - RepoPG
+    IRepoGes - RepoPG
+    
+    IRepoOp -- RepoMem
+    IRepoGes -- RepoMem
+    
+    SvcEA1 ..> IRepoOp : persiste
+    SvcEA2 ..> IRepoGes : persiste
+  }
+}
+
+database "PostgreSQL 16 (Motor de Base de Datos)" {
+  [Tablas Operativas (vehiculo, celda, registro, novedad)] as TablasEA1
+  [Tablas Gestión (usuario, auditoria, cliente, mensualidad)] as TablasEA2
+  [Triggers de Integridad (trg_registro_tipos, trg_auditoria_inmutable)] as Triggers
+  
+  RepoPG --> TablasEA1
+  RepoPG --> TablasEA2
+  TablasEA1 ..> Triggers : ejecuta
+  TablasEA2 ..> Triggers : ejecuta
+}
+@enduml

@@ -1,0 +1,47 @@
+@startuml secuencia_salida
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam roundCorner 8
+
+title Diagrama de Secuencia - Registro de Salida de Vehículo (Iteración 1)
+
+actor "Encargado" as Enc #E8F1F8
+box "Frontend PWA" #F8FAFC
+  participant "Vista Salida\n(React)" as UI #FFFFFF
+end box
+
+box "Backend Go" #F8FAFC
+  participant "HTTP Handler\n(POST /api/salidas)" as API #FFFFFF
+  participant "Servicio Aplicación" as App #FFFFFF
+end box
+
+database "PostgreSQL 16" as DB #E8F1F8
+
+Enc -> UI : Ingresa placa ("AAA-123") y confirma salida
+UI -> API : POST /api/salidas {placa, novedad?}
+activate API
+
+API -> App : RegistrarSalida(ctx, "AAA-123", novedad)
+activate App
+
+App -> DB : Buscar ingreso activo para la placa
+activate DB
+DB --> App : Registro activo encontrado (id_registro, id_celda, fecha_ingreso)
+deactivate DB
+
+App -> App : Calcular minutos de permanencia (RN-04)
+
+App -> DB : Transacción:\n1. Cerrar registro (fecha_salida, minutos)\n2. Actualizar celda a DISPONIBLE
+activate DB
+DB --> App : Operación confirmada
+deactivate DB
+
+App --> API : Retorna Minutos y Celda liberada
+deactivate App
+
+API --> UI : HTTP 200 OK {minutos_estancia: 145, celda: "A-01"}
+deactivate API
+
+UI --> Enc : Muestra tiempo de permanencia y celda libre
+@enduml

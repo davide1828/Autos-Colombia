@@ -1,0 +1,54 @@
+@startuml secuencia_ingreso
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam roundCorner 8
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+
+title Diagrama de Secuencia - Registro de Ingreso de Vehículo (Iteración 1)
+
+actor "Encargado" as Enc #E8F1F8
+box "Frontend PWA" #F8FAFC
+  participant "Vista Ingreso\n(React)" as UI #FFFFFF
+end box
+
+box "Backend Go (Arquitectura Hexagonal)" #F8FAFC
+  participant "HTTP Handler\n(POST /api/ingresos)" as API #FFFFFF
+  participant "Servicio Aplicación\n(ServicioIngresoSalida)" as App #FFFFFF
+  participant "Dominio\n(Entidades & Reglas)" as Dom #FFFFFF
+end box
+
+database "PostgreSQL 16" as DB #E8F1F8
+
+Enc -> UI : Ingresa placa ("AAA-123")\ny selecciona celda ("A-01")
+UI -> API : POST /api/ingresos {placa, id_celda}
+activate API
+
+API -> App : RegistrarIngreso(ctx, "AAA-123", id_celda, novedad)
+activate App
+
+App -> DB : Transacción: Consultar vehículo y mensualidad
+activate DB
+DB --> App : Vehículo registrado, Mensualidad vigente (UTC-5)
+deactivate DB
+
+App -> Dom : Validar reglas RN-01, RN-02, RN-03
+activate Dom
+Dom --> App : Validaciones exitosas (sin ingreso activo, tipos compatibles)
+deactivate Dom
+
+App -> DB : Actualizar celda a OCUPADA\nInsertar nuevo REGISTRO
+activate DB
+note right of DB: Trigger trg_registro_tipos valida\natómicamente la compatibilidad
+DB --> App : Registro confirmado (id_registro)
+deactivate DB
+
+App --> API : Retorna Registro creado
+deactivate App
+
+API --> UI : HTTP 201 Created {id_registro, momento}
+deactivate API
+
+UI --> Enc : Muestra confirmación en verde y celda ocupada
+@enduml
