@@ -1,0 +1,76 @@
+@startuml secuencia_pagos
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+title Diagrama de Secuencia — Gestión de Pagos (Iteración 3)
+
+actor Encargado as Enc
+participant "Frontend\n(React)" as FE
+participant "HTTP Router\n(Go)" as Router
+participant "PagoHandlers\n(httpapi)" as Handler
+participant "ServicioPago\n(application)" as Svc
+participant "Repo\n(postgres)" as Repo
+database "PostgreSQL" as DB
+
+== Registrar Pago (RF-22) ==
+Enc -> FE : Ingresa monto y cliente
+FE -> Router : POST /api/pagos\n{cliente_id, monto}
+Router -> Handler : crearPago()
+Handler -> Svc : CrearPago(ctx, clienteID, monto)
+Svc -> Svc : Validar monto > 0
+Svc -> Repo : CrearPago(ctx, &pago)
+Repo -> DB : BEGIN
+Repo -> DB : INSERT INTO pago\n(id_cliente, monto, fecha, estado)
+DB --> Repo : id_pago generado
+Repo -> DB : COMMIT
+Repo --> Svc : pago con ID
+Svc --> Handler : *domain.Pago
+Handler --> FE : HTTP 201 + JSON pago
+FE --> Enc : Muestra confirmación
+
+== Consultar Historial (RF-23) ==
+Enc -> FE : Selecciona cliente
+FE -> Router : GET /api/pagos?cliente=1
+Router -> Handler : historialPagos()
+Handler -> Svc : Historial(ctx, clienteID)
+Svc -> Repo : HistorialPagos(ctx, clienteID)
+Repo -> DB : SELECT * FROM pago\nWHERE id_cliente=$1\nORDER BY fecha DESC
+DB --> Repo : []Pago
+Repo --> Svc : lista pagos
+Svc --> Handler : []domain.Pago
+Handler --> FE : HTTP 200 + JSON lista
+FE --> Enc : Muestra tabla historial
+
+== Generar Recibo (RF-24) ==
+Enc -> FE : Solicita recibo pago #1
+FE -> Router : POST /api/pagos/1/recibo
+Router -> Handler : generarRecibo()
+Handler -> Svc : GenerarRecibo(ctx, 1)
+Svc -> Repo : ObtenerPago(ctx, 1)
+Repo -> DB : SELECT * FROM pago\nWHERE id_pago=1
+DB --> Repo : pago
+Repo --> Svc : *domain.Pago
+Svc -> Svc : Generar URL recibo
+Svc -> Repo : GuardarRecibo(ctx, 1, url)
+Repo -> DB : UPDATE pago\nSET recibo_url=$1
+DB --> Repo : OK
+Repo --> Svc : nil
+Svc --> Handler : url recibo
+Handler --> FE : HTTP 200 + {recibo_url}
+FE --> Enc : Muestra enlace al recibo
+
+== Cancelar Pago (RF-26) ==
+Enc -> FE : Cancela pago #1
+FE -> Router : POST /api/pagos/1/cancelar
+Router -> Handler : cancelarPago()
+Handler -> Svc : CancelarPago(ctx, 1)
+Svc -> Repo : ActualizarEstado(ctx, 1, "cancelado")
+Repo -> DB : UPDATE pago\nSET estado='cancelado'\nWHERE id_pago=1
+DB --> Repo : 1 fila afectada
+Repo --> Svc : nil
+Svc --> Handler : nil
+Handler --> FE : HTTP 200 + {status: "cancelado"}
+FE --> Enc : Muestra confirmación
+@enduml

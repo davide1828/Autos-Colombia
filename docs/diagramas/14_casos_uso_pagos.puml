@@ -1,0 +1,48 @@
+@startuml casos_uso_iteracion_3_pagos
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam usecaseBackgroundColor #E8F1F8
+skinparam usecaseBorderColor #0f4c81
+skinparam actorBorderColor #0f4c81
+left to right direction
+
+title Casos de uso - Iteración 3: Pagos y mensualidades
+
+actor "Administrador" as Admin
+actor "Encargado" as Enc
+
+rectangle "Sistema Autos Colombia" {
+  usecase "Registrar pago\nmensual" as Registrar
+  usecase "Consultar historial\nde pagos" as Historial
+  usecase "Descargar recibo\nPDF interno" as Recibo
+  usecase "Cancelar pago" as Cancelar
+  usecase "Validar cliente,\nmes, valor y medio" as Validar
+  usecase "Evitar pago activo\nduplicado" as Duplicado
+  usecase "Crear mensualidad\nen la misma transacción" as Mensualidad
+  usecase "Validar usuario\ny permisos" as Permisos
+  usecase "Rechazar ingreso si no\nhay mensualidad vigente" as Acceso
+  usecase "Registrar cliente\ny vehículo" as ClienteVehiculo
+  usecase "Administrar usuarios\ndel sistema" as Usuarios
+}
+
+Admin --> Registrar
+Enc --> Registrar
+Admin --> Historial
+Enc --> Historial
+Admin --> Recibo
+Enc --> Recibo
+Admin --> Cancelar
+Admin --> ClienteVehiculo
+Enc --> ClienteVehiculo
+Admin --> Usuarios
+
+Registrar ..> Validar : <<include>>
+Registrar ..> Duplicado : <<include>>
+Registrar ..> Mensualidad : <<include>>
+Registrar ..> Permisos : <<include>>
+Historial ..> Permisos : <<include>>
+Recibo ..> Permisos : <<include>>
+Cancelar ..> Permisos : <<include>>
+Cancelar ..> Mensualidad : revoca
+Acceso ..> Mensualidad : consulta
+@enduml

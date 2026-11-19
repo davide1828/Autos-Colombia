@@ -11,6 +11,9 @@ La plataforma permite:
 - controlar celdas disponibles y ocupadas
 - manejar novedades asociadas a un vehículo
 - validar usuarios mensuales y condiciones de acceso
+- registrar pagos mensuales, consultar historial y descargar recibos PDF internos
+- impedir nuevos ingresos sin mensualidad vigente y revocar vigencia al cancelar el pago
+- registrar clientes con sus vehículos o asociar vehículos a clientes existentes
 - mantener una auditoría de movimientos y administración del patio
 - ofrecer una interfaz responsive y de fácil uso en celular y escritorio
 
@@ -65,6 +68,8 @@ docker compose up -d db
 ```
 
 Esto crea la base PostgreSQL con el esquema inicial y los datos semilla.
+
+Para una base ya utilizada en Iteraciones 1 o 2, vuelva a aplicar `backend/db/schema.sql` (es repetible) antes de ejecutar la nueva versión. El inicio de la API verifica que exista la tabla `pago` y no arranca si falta el esquema de Iteración 3.
 
 ### 2) Compilar el frontend y dejarlo disponible para la API
 
@@ -145,7 +150,14 @@ Authorization: Bearer <API_TOKEN>
 | POST | `/api/novedades` | Guarda una novedad asociada a una placa |
 | GET | `/api/celdas?estado=DISPONIBLE` | Consulta celdas por estado |
 | GET | `/api/registros/activos` | Muestra los vehículos presentes |
+| POST | `/api/vehiculos` | Registra cliente y vehículo o asocia otro vehículo por documento |
+| POST | `/api/pagos` | Registra pago manual y activa su mensualidad en una transacción |
+| GET | `/api/clientes/{id}/pagos` | Consulta el historial de pagos |
+| GET | `/api/pagos/{id}/recibo` | Descarga el recibo PDF interno |
+| POST | `/api/pagos/{id}/cancelar` | Cancela el pago y revoca la mensualidad (solo administrador) |
 | GET | `/api/sesion` | Valida la sesión o clave de acceso |
+
+El recibo PDF incluye un número interno y una huella SHA-256; no es una factura electrónica validada por DIAN. La gestión de pagos es manual y no procesa transacciones con una pasarela.
 
 ## Calidad y seguridad
 
@@ -165,6 +177,7 @@ El proyecto incluye criterios relevantes de calidad:
 La carpeta `docs/` contiene los artefactos del proyecto:
 
 - diagramas UML de arquitectura y flujo
+- requisitos, trazabilidad y plan de pruebas de la Iteración 3 en gestión de pagos
 - modelado relacional y físico
 - casos de uso y secuencias
 - mockups de pantallas y prototipos de UI

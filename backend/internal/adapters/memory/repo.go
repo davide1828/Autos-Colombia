@@ -29,6 +29,9 @@ type Repo struct {
 	novedades []domain.Novedad
 	sigReg    int
 	sigNov    int
+	pagos     map[int]*domain.Pago
+	pagoMens  map[int]int
+	sigPago   int
 }
 
 func Nuevo() *Repo {
@@ -36,6 +39,7 @@ func Nuevo() *Repo {
 		vehiculos: map[string]*domain.Vehiculo{}, clientes: map[int]string{}, docs: map[string]int{}, sigCli: 1000, sigVeh: 1000,
 		mens: map[int][]domain.Mensualidad{}, documento: map[int]string{}, telefono: map[int]string{},
 		usuarios: map[int]*domain.Usuario{}, celdas: map[int]*domain.Celda{},
+		pagos: map[int]*domain.Pago{}, pagoMens: map[int]int{},
 	}
 }
 

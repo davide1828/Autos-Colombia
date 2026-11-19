@@ -114,3 +114,26 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_registro_tipos ON registro;
 CREATE TRIGGER trg_registro_tipos BEFORE INSERT ON registro
     FOR EACH ROW EXECUTE FUNCTION registro_tipos_compatibles();
+
+-- =====================================================================
+-- Iteración 3: registro de pagos mensuales y recibos internos
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS pago (
+    id_pago         SERIAL PRIMARY KEY,
+    id_cliente      INT         NOT NULL REFERENCES cliente(id_cliente),
+    id_mensualidad  INT UNIQUE REFERENCES mensualidad(id_mensualidad) ON DELETE SET NULL,
+    monto           BIGINT      NOT NULL CHECK (monto > 0),
+    fecha           TIMESTAMPTZ NOT NULL,
+    periodo_inicio  DATE        NOT NULL,
+    periodo_fin     DATE        NOT NULL,
+    medio_pago      VARCHAR(20) NOT NULL CHECK (medio_pago IN ('EFECTIVO', 'TRANSFERENCIA', 'TARJETA')),
+    estado          VARCHAR(12) NOT NULL CHECK (estado IN ('PAGADO', 'CANCELADO')),
+    sello_digital   CHAR(64),
+    CONSTRAINT ck_pago_periodo CHECK (
+        periodo_inicio = date_trunc('month', periodo_inicio)::date
+        AND periodo_fin = (periodo_inicio + INTERVAL '1 month - 1 day')::date
+    )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_pago_cliente_periodo_pagado
+    ON pago (id_cliente, periodo_inicio) WHERE estado = 'PAGADO';
+CREATE INDEX IF NOT EXISTS ix_pago_cliente_fecha ON pago (id_cliente, fecha DESC);

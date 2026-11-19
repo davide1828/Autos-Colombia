@@ -11,6 +11,8 @@ import Salida from "./views/Salida.jsx";
 import UsuariosAdmin from "./views/UsuariosAdmin.jsx";
 import CeldasAdmin from "./views/CeldasAdmin.jsx";
 import AuditoriaAdmin from "./views/AuditoriaAdmin.jsx";
+import PagosAdmin from "./views/PagosAdmin.jsx";
+import ClientesVehiculos from "./views/ClientesVehiculos.jsx";
 
 const REFRESCO_MS = 30_000;
 
@@ -73,6 +75,8 @@ function Tablero({ usuario, sinSesion }) {
     ? [
         { id: "usuarios", texto: "Usuarios", icono: "entrar" },
         { id: "celdasAdmin", texto: "Celdas", icono: "patio" },
+        { id: "clientesVehiculos", texto: "Clientes y vehículos", icono: "novedad" },
+        { id: "pagos", texto: "Pagos", icono: "novedad" },
         { id: "auditoria", texto: "Auditoría", icono: "novedad" },
         { id: "ingreso", texto: "Ingreso", icono: "entrar" },
         { id: "salida", texto: "Salida", icono: "salir" },
@@ -84,6 +88,8 @@ function Tablero({ usuario, sinSesion }) {
         { id: "salida", texto: "Salida", icono: "salir" },
         { id: "novedad", texto: "Novedad", icono: "novedad" },
         { id: "patio", texto: "Patio", icono: "patio", soloMovil: true },
+        { id: "clientesVehiculos", texto: "Clientes y vehículos", icono: "novedad" },
+        { id: "pagos", texto: "Pagos", icono: "novedad" },
       ];
 
   // Con pantalla ancha en modo encargado, el patio está siempre al lado
@@ -102,7 +108,7 @@ function Tablero({ usuario, sinSesion }) {
   const r = resumenOcupacion(celdas);
   const patio = <Patio celdas={celdas} activos={activos} ahora={ahora} cargando={cargando} error={error} />;
 
-  const esVistaAdmin = ["usuarios", "celdasAdmin", "auditoria"].includes(vista);
+  const esVistaAdmin = ["usuarios", "celdasAdmin", "clientesVehiculos", "pagos", "auditoria"].includes(vista);
 
   return (
     <div className="app">
@@ -177,6 +183,8 @@ function Tablero({ usuario, sinSesion }) {
           <div className="contenido__admin">
             {vista === "usuarios" && <UsuariosAdmin usuarioActual={usuario?.usuario} />}
             {vista === "celdasAdmin" && <CeldasAdmin alActualizar={refrescar} />}
+            {vista === "clientesVehiculos" && <ClientesVehiculos />}
+            {vista === "pagos" && <PagosAdmin esAdmin={esAdmin} />}
             {vista === "auditoria" && <AuditoriaAdmin />}
           </div>
         ) : (

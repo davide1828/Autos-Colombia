@@ -11,6 +11,7 @@ import (
 
 // Repositorio es el puerto de salida hacia la persistencia.
 type Repositorio interface {
+	domain.RepositorioPago
 	VehiculoPorPlaca(ctx context.Context, placa string) (*domain.Vehiculo, error)
 	MensualidadVigente(ctx context.Context, clienteID int, dia time.Time) (bool, error)
 	Celda(ctx context.Context, id int) (*domain.Celda, error)
@@ -28,6 +29,7 @@ type Repositorio interface {
 	RegistrosActivos(ctx context.Context) ([]domain.RegistroDetalle, error)
 
 	RepositorioGestion // Iteración 2: usuarios, clientes, celdas y auditoría
+	ActualizarCelda(ctx context.Context, c *domain.Celda) error
 }
 
 type NovedadEntrada struct {
@@ -76,6 +78,7 @@ var ZonaColombia = time.FixedZone("COT", -5*60*60)
 
 type Servicio struct {
 	repo      Repositorio
+	pagos     *ServicioPago
 	ahora     func() time.Time
 	hash      Hasheador
 	hashFalso string // hash de un usuario inexistente: iguala el tiempo de respuesta del login
@@ -85,7 +88,7 @@ func NuevoServicio(repo Repositorio, ahora func() time.Time) *Servicio {
 	if ahora == nil {
 		ahora = time.Now
 	}
-	return &Servicio{repo: repo, ahora: ahora}
+	return &Servicio{repo: repo, pagos: NuevoServicioPago(repo, ahora), ahora: ahora}
 }
 
 func (s *Servicio) novedad(in *NovedadEntrada, m domain.MomentoNovedad, vehiculoID int) (*domain.Novedad, error) {

@@ -101,6 +101,28 @@ export const api = {
   clientes: (q = "") => llamar(`/api/clientes?q=${encodeURIComponent(q)}`),
   cliente: (id) => llamar(`/api/clientes/${id}`),
   agregarMensualidad: (idCliente, d) => post(`/api/clientes/${idCliente}/mensualidades`, d),
+  crearVehiculo: (d) => post("/api/vehiculos", d),
+
+  // ---------- Gestión de Pagos (Iteración 3) ----------
+  registrarPago: (d) => post("/api/pagos", d),
+  historialPagos: (idCliente) => llamar(`/api/clientes/${idCliente}/pagos`),
+  cancelarPago: (idPago) => post(`/api/pagos/${idPago}/cancelar`, {}),
+  reciboPago: async (idPago) => {
+    let res;
+    try {
+      res = await fetch(`/api/pagos/${idPago}/recibo`, {
+        headers: { Authorization: `Bearer ${sesion.leer()}` },
+      });
+    } catch {
+      throw new ApiError("No hay conexión con el servidor. Revise la red e inténtelo de nuevo.", 0);
+    }
+    if (res.status === 401) alNoAutorizado();
+    if (!res.ok) {
+      const datos = await res.json().catch(() => ({}));
+      throw new ApiError(datos.mensaje || "No se pudo generar el recibo.", res.status);
+    }
+    return res.blob();
+  },
 
   // ---------- Auditoría Inmutable (Iteración 2 - Admin) ----------
   auditoria: (limite = 50) => llamar(`/api/auditoria?limite=${limite}`),

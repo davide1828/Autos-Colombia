@@ -81,8 +81,7 @@ func (r *Repo) CrearUsuario(ctx context.Context, u *domain.Usuario) error {
 	return err
 }
 
-// ActualizarUsuario serializa los cambios sobre los administradores activos con bloqueo de filas, de modo que
-// dos administradores que se desactiven a la vez no puedan dejar el sistema sin ninguno.
+// ActualizarUsuario serializa los cambios sobre los administradores activos con bloqueo de filas.
 func (r *Repo) ActualizarUsuario(ctx context.Context, u *domain.Usuario) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -168,16 +167,18 @@ func (r *Repo) BuscarClientes(ctx context.Context, q string, limite int) ([]doma
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	out := []domain.ClienteDetalle{}
 	for rows.Next() {
 		var c domain.ClienteDetalle
 		if err := rows.Scan(&c.ID, &c.Documento, &c.Nombre, &c.Telefono); err != nil {
-			rows.Close()
 			return nil, err
 		}
 		out = append(out, c)
 	}
-	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, r.cargarDetalle(ctx, out)
 }
 
@@ -357,19 +358,18 @@ func (r *Repo) Auditorias(ctx context.Context, limite int) ([]domain.Auditoria, 
 	return out, rows.Err()
 }
 
-// EsquemaActualizado verifica que la base tenga las tablas y reglas de la Iteración 2. Las bases creadas con la
-// Iteración 1 deben actualizarse con db/schema.sql (es repetible: solo agrega lo que falta).
+// EsquemaActualizado verifica que la base tenga las tablas y reglas de las iteraciones 2 y 3.
 func (r *Repo) EsquemaActualizado(ctx context.Context) error {
 	var tablas, triggers int
 	if err := r.db.QueryRowContext(ctx,
-		`SELECT count(*) FROM unnest(ARRAY['usuario','auditoria']) t WHERE to_regclass('public.'||t) IS NOT NULL`).Scan(&tablas); err != nil {
+		`SELECT count(*) FROM unnest(ARRAY['usuario','auditoria','pago']) t WHERE to_regclass('public.'||t) IS NOT NULL`).Scan(&tablas); err != nil {
 		return err
 	}
 	if err := r.db.QueryRowContext(ctx,
 		`SELECT count(*) FROM pg_trigger WHERE tgname IN ('trg_auditoria_inmutable','trg_registro_tipos') AND NOT tgisinternal`).Scan(&triggers); err != nil {
 		return err
 	}
-	if tablas != 2 || triggers != 2 {
+	if tablas != 3 || triggers != 2 {
 		return errors.New("el esquema de la base de datos está desactualizado: aplique backend/db/schema.sql (es repetible)")
 	}
 	return nil

@@ -2,6 +2,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -78,6 +79,7 @@ func (a *API) Rutas() http.Handler {
 	mux.HandleFunc("PATCH /api/usuarios/{id}", a.requiere(soloAdmin, a.editarUsuario))
 	mux.HandleFunc("POST /api/usuarios/{id}/clave", a.requiere(soloAdmin, a.restablecerClave))
 	mux.HandleFunc("GET /api/auditoria", a.requiere(soloAdmin, a.auditoria))
+	a.registrarRutasPago(mux)
 
 	// Comodín: distingue "la ruta no existe" (404) de "método no permitido" (405) con respuestas JSON.
 	permitidos := []struct {
@@ -89,6 +91,10 @@ func (a *API) Rutas() http.Handler {
 		{regexp.MustCompile(`^/api/(celdas|vehiculos|clientes|usuarios)$`), "GET, POST"},
 		{regexp.MustCompile(`^/api/(vehiculos|clientes|usuarios|celdas)/\d+$`), "GET, PATCH"},
 		{regexp.MustCompile(`^/api/clientes/\d+/mensualidades$`), "POST"},
+		{regexp.MustCompile(`^/api/pagos$`), "POST"},
+		{regexp.MustCompile(`^/api/clientes/\d+/pagos$`), "GET"},
+		{regexp.MustCompile(`^/api/pagos/\d+/recibo$`), "GET"},
+		{regexp.MustCompile(`^/api/pagos/\d+/cancelar$`), "POST"},
 		{regexp.MustCompile(`^/api/usuarios/\d+/clave$`), "POST"},
 		{regexp.MustCompile(`^/api/celdas/\d+/estado$`), "PUT"},
 	}
@@ -121,11 +127,15 @@ func (a *API) auth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		actor, err := a.firma.verificar(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 		if err == nil {
-			var u *domain.Usuario
-			if u, err = a.svc.Usuario(r.Context(), actor.ID); err == nil && u.Activo {
-				actor.Usuario, actor.Rol = u.Usuario, u.Rol
-			} else {
+			u, lookupErr := a.svc.Usuario(r.Context(), actor.ID)
+			if lookupErr != nil && !errors.Is(lookupErr, domain.ErrUsuarioNoExiste) {
+				a.responderError(w, lookupErr)
+				return
+			}
+			if errors.Is(lookupErr, domain.ErrUsuarioNoExiste) || (lookupErr == nil && !u.Activo) {
 				err = errTokenInvalido
+			} else {
+				actor.Usuario, actor.Rol = u.Usuario, u.Rol
 			}
 		}
 		if err != nil {
@@ -287,22 +297,27 @@ func escribirError(w http.ResponseWriter, codigo int, clave, mensaje string) {
 // responderError traduce errores de negocio a códigos HTTP.
 func (a *API) responderError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		escribirError(w, http.StatusGatewayTimeout, "tiempo_agotado", "la operación de pago superó su límite de 1,8 segundos")
 	case errors.Is(err, domain.ErrPlacaInvalida), errors.Is(err, domain.ErrNovedadInvalida), errors.Is(err, domain.ErrTipoVehiculoInvalido),
 		errors.Is(err, domain.ErrClienteInvalido), errors.Is(err, domain.ErrMensualidadInvalida), errors.Is(err, domain.ErrUsuarioInvalido),
 		errors.Is(err, domain.ErrClaveDebil), errors.Is(err, domain.ErrRolInvalido), errors.Is(err, domain.ErrCeldaInvalida),
-		errors.Is(err, domain.ErrEstadoCeldaInvalido), errors.Is(err, domain.ErrClaveActualIncorrecta):
+		errors.Is(err, domain.ErrEstadoCeldaInvalido), errors.Is(err, domain.ErrClaveActualIncorrecta),
+		errors.Is(err, domain.ErrPagoInvalido), errors.Is(err, domain.ErrPeriodoPagoInvalido):
 		escribirError(w, 400, "datos_invalidos", err.Error())
 	case errors.Is(err, domain.ErrCredenciales):
 		escribirError(w, 401, "no_autorizado", err.Error())
 	case errors.Is(err, domain.ErrSinPermiso):
 		escribirError(w, 403, "sin_permiso", err.Error())
 	case errors.Is(err, domain.ErrVehiculoNoRegistrado), errors.Is(err, domain.ErrCeldaNoExiste), errors.Is(err, domain.ErrUsuarioNoExiste),
-		errors.Is(err, domain.ErrClienteNoExiste):
+		errors.Is(err, domain.ErrClienteNoExiste), errors.Is(err, domain.ErrPagoNoExiste):
 		escribirError(w, 404, "no_encontrado", err.Error())
 	case errors.Is(err, domain.ErrVehiculoYaDentro), errors.Is(err, domain.ErrCeldaNoDisponible), errors.Is(err, domain.ErrSinIngresoActivo),
 		errors.Is(err, domain.ErrPlacaYaRegistrada), errors.Is(err, domain.ErrUsuarioDuplicado), errors.Is(err, domain.ErrUltimoAdministrador),
 		errors.Is(err, domain.ErrCeldaDuplicada), errors.Is(err, domain.ErrCeldaOcupada), errors.Is(err, domain.ErrVehiculoDentro),
 		errors.Is(err, domain.ErrMensualidadSolapada):
+		escribirError(w, 409, "conflicto", err.Error())
+	case errors.Is(err, domain.ErrPagoDuplicado), errors.Is(err, domain.ErrPagoYaCancelado), errors.Is(err, domain.ErrPagoCambio):
 		escribirError(w, 409, "conflicto", err.Error())
 	case errors.Is(err, domain.ErrMensualidadVencida), errors.Is(err, domain.ErrCeldaIncompatible):
 		escribirError(w, 422, "regla_de_negocio", err.Error())

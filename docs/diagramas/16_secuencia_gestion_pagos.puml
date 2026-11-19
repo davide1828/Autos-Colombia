@@ -1,0 +1,72 @@
+@startuml secuencia_gestion_pagos_iteracion_3
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam roundCorner 8
+skinparam ParticipantPadding 10
+
+title Secuencia - Pago mensual, vigencia y recibo (Iteración 3)
+
+actor "Encargado" as Enc
+actor "Administrador" as Admin
+participant "Vista Pagos\n(React)" as UI
+participant "API HTTP\n+ sesión/RBAC" as API
+participant "Servicio de\naplicación" as App
+participant "Dominio\n(reglas de pago)" as Dom
+database "PostgreSQL" as DB
+
+Enc -> UI : Selecciona cliente, mes, monto y medio
+UI -> API : POST /api/pagos\n{id_cliente, periodo, monto, medio_pago}
+activate API
+API -> API : Autenticar sesión y validar rol
+API -> App : RegistrarPago(ctx, solicitud)
+activate App
+App -> Dom : Validar periodo actual/futuro,\nmonto positivo y medio permitido
+activate Dom
+Dom --> App : Datos válidos
+deactivate Dom
+App -> DB : BEGIN; bloquear cliente FOR UPDATE
+activate DB
+DB --> App : Cliente encontrado
+App -> DB : Comprobar pago duplicado y periodo superpuesto
+DB --> App : Sin duplicado ni solapamiento
+App -> DB : INSERT mensualidad + INSERT pago
+DB --> App : IDs persistidos
+App -> DB : COMMIT
+DB --> App : Confirmado
+deactivate DB
+App --> API : Pago registrado
+deactivate App
+API --> UI : 201 Created
+deactivate API
+UI --> Enc : Pago y mensualidad vigentes
+
+group Consulta y recibo
+  Enc -> UI : Consultar historial / descargar PDF
+  UI -> API : GET /api/clientes/{id}/pagos\nGET /api/pagos/{id}/recibo
+  API -> App : Consultar historial / generar recibo
+  App -> DB : Consultar pago y cliente
+  DB --> App : Datos persistidos
+  App -> App : Calcular SHA-256 reproducible\nConstruir PDF interno numerado AC-AAAA-ID
+  App --> API : Historial / application/pdf
+  API --> UI : 200 OK
+end
+
+group Cancelación (solo administrador)
+  Admin -> UI : Confirma cancelación
+  UI -> API : POST /api/pagos/{id}/cancelar
+  API -> API : Validar rol Administrador
+  API -> App : CancelarPago(ctx, id)
+  App -> DB : BEGIN; bloquear pago FOR UPDATE
+  App -> DB : DELETE mensualidad + UPDATE estado CANCELADO
+  App -> DB : COMMIT
+  DB --> App : Confirmado
+  App --> API : Pago cancelado; periodo revocado
+  API --> UI : 200 OK
+end
+
+note over UI,DB
+Todas las rutas de pagos tienen un límite de 1,8 s.
+El recibo es interno: su huella SHA-256 no es firma DIAN.
+end note
+@enduml
